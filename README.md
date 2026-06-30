@@ -38,10 +38,4 @@ Nếu bạn muốn tạo ra một file thực thi độc lập (không cần cà
 
 3. File `main.exe` (hay `PDF Renamer Pro.exe` nếu bạn đổi tên) sẽ được tạo ra trong thư mục `dist/`.
 
-## Tính năng chính
-- Tự động trích xuất "Số ký hiệu" (ví dụ: 13/QĐ) và "Ngày văn bản".
-- Sắp xếp thông minh: Ưu tiên Số KH -> Ngày văn bản -> Ngày sửa file (MTime).
-- Đánh số thứ tự tự động và giữ nguyên số lượng chữ số (ví dụ: 043 -> 044).
-- Giao diện người dùng trực quan, hỗ trợ kéo thả sắp xếp dòng, bỏ qua file, xem trước hình ảnh trang PDF.
-- Lưu lại lịch sử đổi tên và hỗ trợ hoàn tác 1 lần gần nhất.
-- Hỗ trợ đổi tên tùy chỉnh bằng tay nếu OCR không đọc được.
+
