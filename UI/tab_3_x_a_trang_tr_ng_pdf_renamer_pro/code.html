@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PDF Utility Office - Xóa trang trắng</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#0078d4",
+                        "on-secondary-container": "#007327",
+                        "tertiary": "#7b5800",
+                        "surface-container-highest": "#e2e2e2",
+                        "surface-tint": "#0060ab",
+                        "on-secondary-fixed-variant": "#00531a",
+                        "outline": "#717783",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "inverse-surface": "#2f3131",
+                        "on-tertiary-container": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "inverse-on-surface": "#f1f1f1",
+                        "on-primary-container": "#ffffff",
+                        "outline-variant": "#c0c7d4",
+                        "on-background": "#1a1c1c",
+                        "background": "#f9f9f9",
+                        "secondary-fixed": "#83fc8e",
+                        "on-secondary-fixed": "#002106",
+                        "on-error": "#ffffff",
+                        "primary": "#005faa",
+                        "secondary": "#006e25",
+                        "surface-dim": "#dadada",
+                        "primary-fixed-dim": "#a3c9ff",
+                        "on-surface": "#1a1c1c",
+                        "on-tertiary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-bright": "#f9f9f9",
+                        "error": "#ba1a1a",
+                        "surface-container-low": "#f3f3f3",
+                        "surface": "#f9f9f9",
+                        "secondary-fixed-dim": "#66df75",
+                        "on-primary-fixed": "#001c39",
+                        "surface-variant": "#e2e2e2",
+                        "surface-container": "#eeeeee",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-high": "#e8e8e8",
+                        "on-primary-fixed-variant": "#004883",
+                        "tertiary-fixed": "#ffdea7",
+                        "tertiary-container": "#9a6f00",
+                        "secondary-container": "#80f98b",
+                        "on-error-container": "#93000a",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed": "#271900",
+                        "primary-fixed": "#d3e3ff",
+                        "on-surface-variant": "#404752",
+                        "tertiary-fixed-dim": "#ffbb18",
+                        "inverse-primary": "#a3c9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "base": "4px",
+                        "xs": "8px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "margin": "24px",
+                        "sm": "12px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter", "Segoe UI", "sans-serif"],
+                        "headline-md": ["Inter", "Segoe UI", "sans-serif"],
+                        "body-lg": ["Inter", "Segoe UI", "sans-serif"],
+                        "label-md": ["Inter", "Segoe UI", "sans-serif"],
+                        "body-md": ["Inter", "Segoe UI", "sans-serif"],
+                        "mono-sm": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+            line-height: 1;
+        }
+        body {
+            font-family: 'Segoe UI', 'Inter', sans-serif;
+            background-color: #f9f9f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        .zebra-row:nth-child(even) {
+            background-color: #F3F3F3;
+        }
+    </style>
+</head>
+<body class="text-on-surface flex flex-col h-screen overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface-container-lowest flex flex-col w-full px-margin pt-xs border-b border-outline-variant">
+<div class="flex justify-between items-center mb-xs">
+<h1 class="font-headline-lg text-headline-lg font-bold text-primary">PDF Renamer Pro</h1>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container transition-colors p-xs rounded">settings</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container transition-colors p-xs rounded">help</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a corporate user with a neutral, friendly expression. The lighting is soft and professional, set against a clean, minimalist office background with a cool blue and white color palette consistent with Windows 11 aesthetics." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzHW88Zr7DDKZYo1JHLODaCIAsGrP79WV7fvwkAWwheRHKzQJ7juHvZ_k_lKQ85_HpBvjWpttZ-D_egcx0zqCMlcVRGgVel9yF6z_RYT1GcYfTJW1kZdh22d-FDTdFUdtmKPsVO2EsYq-ENh46hZOUvalAFrtDuxD2Y4L5gOBvCqFjCuk7LVP5SCNyblGkdq0mv7f-HbvhoNdL1MuaEckBBbKP6tEoi8f4quCOrPVf_0my4n0_OqKwm8iQj1wG1z5IczO6xhkHosM"/>
+</div>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<nav class="flex gap-xl">
+<a class="text-on-surface-variant pb-1 font-label-md text-label-md hover:bg-surface-container transition-colors" href="#">Đổi tên PDF</a>
+<a class="text-on-surface-variant pb-1 font-label-md text-label-md hover:bg-surface-container transition-colors" href="#">Tìm trang trắng</a>
+<a class="text-primary border-b-2 border-primary pb-1 font-bold font-label-md text-label-md" href="#">Xóa trang trắng</a>
+</nav>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 flex overflow-hidden p-margin gap-lg">
+<!-- Left Section: Config & Table -->
+<div class="flex-1 flex flex-col gap-md overflow-hidden">
+<!-- Config Area -->
+<section class="bg-surface-container-lowest border border-outline-variant p-md rounded shadow-sm">
+<div class="flex flex-col gap-sm">
+<div class="flex items-center gap-sm">
+<label class="font-label-md text-label-md w-32 shrink-0">Thư mục làm việc:</label>
+<div class="flex-1 bg-surface-container-low border border-outline-variant px-sm py-xs text-body-md font-mono-sm text-on-surface-variant rounded cursor-not-allowed flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">folder_open</span>
+                            C:\Users\Admin\Documents\Project_2024\PDF_Exports
+                        </div>
+</div>
+<div class="flex items-center gap-xl">
+<label class="font-label-md text-label-md w-32 shrink-0">Chế độ lưu:</label>
+<div class="flex gap-lg items-center">
+<label class="flex items-center gap-xs cursor-pointer group">
+<input checked="" class="w-4 h-4 text-primary focus:ring-primary border-outline" name="save_mode" type="radio"/>
+<span class="text-body-md group-hover:text-primary transition-colors">Ghi đè file gốc</span>
+</label>
+<label class="flex items-center gap-xs cursor-pointer group">
+<input class="w-4 h-4 text-primary focus:ring-primary border-outline" name="save_mode" type="radio"/>
+<span class="text-body-md group-hover:text-primary transition-colors">Lưu vào thư mục mới</span>
+</label>
+<div class="relative flex items-center ml-xs">
+<span class="text-label-md text-on-surface-variant mr-xs">Tên hậu tố:</span>
+<input class="w-24 bg-surface-container-lowest border border-outline-variant px-xs py-1 text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none rounded" type="text" value="cleaned"/>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Data Table Area -->
+<section class="flex-1 bg-surface-container-lowest border border-outline-variant rounded overflow-hidden flex flex-col shadow-sm">
+<div class="overflow-x-auto custom-scrollbar flex-1">
+<table class="w-full text-left border-collapse min-w-[800px]">
+<thead class="bg-surface-container-low sticky top-0 z-10 border-b-2 border-outline-variant">
+<tr>
+<th class="p-xs w-10 text-center"><input class="rounded border-outline text-primary" type="checkbox"/></th>
+<th class="font-label-md text-label-md p-sm text-on-surface-variant">STT</th>
+<th class="font-label-md text-label-md p-sm text-on-surface-variant">Tên file</th>
+<th class="font-label-md text-label-md p-sm text-on-surface-variant">Trang sẽ xóa</th>
+<th class="font-label-md text-label-md p-sm text-on-surface-variant">Trang còn lại</th>
+<th class="font-label-md text-label-md p-sm text-on-surface-variant">Trạng thái</th>
+</tr>
+</thead>
+<tbody class="text-body-md">
+<!-- Row 1 -->
+<tr class="zebra-row hover:bg-surface-container-highest transition-colors cursor-pointer group border-b border-outline-variant">
+<td class="p-xs text-center"><input checked="" class="rounded border-outline text-primary" type="checkbox"/></td>
+<td class="p-sm text-on-surface-variant">01</td>
+<td class="p-sm font-semibold">Bao_cao_tai_chinh_Q3.pdf</td>
+<td class="p-sm">
+<span class="bg-[#FEE2E2] text-[#991B1B] px-xs py-0.5 rounded font-mono-sm">2, 5, 12, 18</span>
+</td>
+<td class="p-sm">
+<span class="bg-[#DBEAFE] text-[#1E40AF] px-xs py-0.5 rounded font-mono-sm">1, 3, 4, 6-11, 13-17</span>
+</td>
+<td class="p-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">info</span>
+<span class="text-primary font-bold">Chờ xử lý</span>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="zebra-row hover:bg-surface-container-highest transition-colors cursor-pointer group border-b border-outline-variant bg-surface-container-low">
+<td class="p-xs text-center"><input class="rounded border-outline text-primary" type="checkbox"/></td>
+<td class="p-sm text-on-surface-variant">02</td>
+<td class="p-sm font-semibold">Hop_dong_lao_dong_v2.pdf</td>
+<td class="p-sm">
+<span class="bg-[#FEE2E2] text-[#991B1B] px-xs py-0.5 rounded font-mono-sm">8</span>
+</td>
+<td class="p-sm">
+<span class="bg-[#DBEAFE] text-[#1E40AF] px-xs py-0.5 rounded font-mono-sm">1-7, 9</span>
+</td>
+<td class="p-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+<span class="text-secondary font-bold">Hoàn tất</span>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="zebra-row hover:bg-surface-container-highest transition-colors cursor-pointer group border-b border-outline-variant">
+<td class="p-xs text-center"><input checked="" class="rounded border-outline text-primary" type="checkbox"/></td>
+<td class="p-sm text-on-surface-variant">03</td>
+<td class="p-sm font-semibold">Huong_dan_su_dung_NEW.pdf</td>
+<td class="p-sm">
+<span class="bg-[#FEE2E2] text-[#991B1B] px-xs py-0.5 rounded font-mono-sm">15, 22-25</span>
+</td>
+<td class="p-sm">
+<span class="bg-[#DBEAFE] text-[#1E40AF] px-xs py-0.5 rounded font-mono-sm">1-14, 16-21, 26-40</span>
+</td>
+<td class="p-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">info</span>
+<span class="text-primary font-bold">Chờ xử lý</span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<!-- Right Section: Mini Preview -->
+<aside class="w-80 flex flex-col gap-md shrink-0">
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-md flex flex-col h-full shadow-sm">
+<div class="flex items-center justify-between mb-sm">
+<h3 class="font-headline-md text-headline-md text-on-surface">Xem trước</h3>
+<span class="text-label-md text-on-surface-variant font-mono-sm">Trang 2 / 24</span>
+</div>
+<div class="flex-1 bg-surface-dim rounded border border-outline-variant relative overflow-hidden flex items-center justify-center p-xs group">
+<img class="max-w-full max-h-full shadow-lg" data-alt="A clean, high-resolution rendering of a blank PDF document page showing a faint, elegant watermark of a corporate logo. The page is slightly off-white, suggesting high-quality paper texture. The lighting highlights a subtle 3D shadow effect from the edge of the document, placing it in a realistic digital workspace. Minimalist blue accents border the page." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5RT2gthwaQx5DhSUrx-ifeufu0LBhbvr5XV3ANkqu7PqFuI0OgEWbOSvwwWrQu0rMf4oKulSyRAlZJyjd8uiTu5nBm00OqZXdKmWTic530XRjXFvmqXjLyWC23lnYP8qJSiz3UKXhVPEu72XSk4Wz2y1Q23ka1qMcUOCMhSqODw7vwhJ6nWyBn5aWxBTkik4az4VRQmsq2P5Be2c8nU7s9Oi2aLDrFf6vsF2QEzJcPmgv-5SxXeAU-9kXgsbnSO_dhs_SD5efb70"/>
+<div class="absolute inset-0 bg-error/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<div class="bg-error text-white px-md py-xs rounded-full font-bold flex items-center gap-xs">
+<span class="material-symbols-outlined">delete</span>
+                            Sẽ xóa trang này
+                        </div>
+</div>
+</div>
+<div class="mt-md flex flex-col gap-xs">
+<p class="text-body-md font-semibold truncate">Bao_cao_tai_chinh_Q3.pdf</p>
+<div class="grid grid-cols-2 gap-xs">
+<button class="bg-surface-container-high hover:bg-surface-container-highest text-on-surface py-xs rounded flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="bg-surface-container-high hover:bg-surface-container-highest text-on-surface py-xs rounded flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</aside>
+</main>
+<!-- Footer Bar -->
+<footer class="bg-surface-container border-t border-outline-variant px-margin py-sm flex items-center justify-between z-40">
+<div class="flex-1 max-w-md mr-xl">
+<div class="flex justify-between items-center mb-1">
+<span class="text-label-md text-on-surface-variant">Tiến độ xử lý: 0/3 files</span>
+<span class="text-label-md font-mono-sm text-primary">0%</span>
+</div>
+<div class="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary w-0 transition-all duration-500" id="progress-bar"></div>
+</div>
+</div>
+<div class="flex gap-md items-center">
+<button class="flex items-center gap-xs bg-[#FF9800] hover:bg-[#F57C00] text-white px-lg py-xs rounded font-bold transition-transform active:scale-95 shadow-sm">
+<span class="material-symbols-outlined">undo</span>
+                Hoàn tác
+            </button>
+<button class="flex items-center gap-xs bg-[#E02424] hover:bg-[#C81E1E] text-white px-xl py-xs rounded font-bold transition-transform active:scale-95 shadow-md" id="btn-process">
+<span class="material-symbols-outlined">delete</span>
+                Xóa trang trắng
+            </button>
+</div>
+</footer>
+<script>
+        // Simple Interaction logic for demo
+        document.getElementById('btn-process').addEventListener('click', function() {
+            const bar = document.getElementById('progress-bar');
+            bar.style.width = '100%';
+            this.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Đang xử lý...';
+            this.classList.add('opacity-80', 'pointer-events-none');
+            
+            setTimeout(() => {
+                this.innerHTML = '<span class="material-symbols-outlined">check</span> Đã hoàn tất';
+                this.classList.remove('bg-[#E02424]');
+                this.classList.add('bg-secondary');
+            }, 2000);
+        });
+
+        // Row selection simulation
+        const rows = document.querySelectorAll('.zebra-row');
+        rows.forEach(row => {
+            row.addEventListener('click', () => {
+                rows.forEach(r => r.classList.remove('bg-primary-container/10', 'border-l-4', 'border-l-primary'));
+                row.classList.add('bg-primary-container/10', 'border-l-4', 'border-l-primary');
+            });
+        });
+    </script>
+</body></html>

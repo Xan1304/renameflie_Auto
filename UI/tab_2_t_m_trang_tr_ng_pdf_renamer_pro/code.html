@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PDF Renamer Pro - Tìm trang trắng</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: #f9f9f9;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        /* Zebra striping for table */
+        tbody tr:nth-child(even) {
+            background-color: #f3f3f3;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary-container": "#0078d4",
+                      "on-secondary-container": "#007327",
+                      "tertiary": "#7b5800",
+                      "surface-container-highest": "#e2e2e2",
+                      "surface-tint": "#0060ab",
+                      "on-secondary-fixed-variant": "#00531a",
+                      "outline": "#717783",
+                      "on-tertiary-fixed-variant": "#5e4200",
+                      "inverse-surface": "#2f3131",
+                      "on-tertiary-container": "#ffffff",
+                      "on-primary": "#ffffff",
+                      "inverse-on-surface": "#f1f1f1",
+                      "on-primary-container": "#ffffff",
+                      "outline-variant": "#c0c7d4",
+                      "on-background": "#1a1c1c",
+                      "background": "#f9f9f9",
+                      "secondary-fixed": "#83fc8e",
+                      "on-secondary-fixed": "#002106",
+                      "on-error": "#ffffff",
+                      "primary": "#005faa",
+                      "secondary": "#006e25",
+                      "surface-dim": "#dadada",
+                      "primary-fixed-dim": "#a3c9ff",
+                      "on-surface": "#1a1c1c",
+                      "on-tertiary": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "surface-bright": "#f9f9f9",
+                      "error": "#ba1a1a",
+                      "surface-container-low": "#f3f3f3",
+                      "surface": "#f9f9f9",
+                      "secondary-fixed-dim": "#66df75",
+                      "on-primary-fixed": "#001c39",
+                      "surface-variant": "#e2e2e2",
+                      "surface-container": "#eeeeee",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-high": "#e8e8e8",
+                      "on-primary-fixed-variant": "#004883",
+                      "tertiary-fixed": "#ffdea7",
+                      "tertiary-container": "#9a6f00",
+                      "secondary-container": "#80f98b",
+                      "on-error-container": "#93000a",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary-fixed": "#271900",
+                      "primary-fixed": "#d3e3ff",
+                      "on-surface-variant": "#404752",
+                      "tertiary-fixed-dim": "#ffbb18",
+                      "inverse-primary": "#a3c9ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "base": "4px",
+                      "xs": "8px",
+                      "lg": "24px",
+                      "xl": "32px",
+                      "margin": "24px",
+                      "sm": "12px",
+                      "md": "16px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "label-md": ["Inter"],
+                      "body-md": ["Inter"],
+                      "mono-sm": ["JetBrains Mono"]
+              },
+              "fontSize": {
+                      "headline-lg": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "mono-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface h-screen flex flex-col overflow-hidden">
+<!-- Top Navigation Bar -->
+<header class="bg-surface-container-lowest flex flex-col w-full px-margin pt-xs border-b border-outline-variant">
+<div class="flex items-center justify-between mb-sm">
+<h1 class="font-headline-lg text-headline-lg font-bold text-primary">PDF Renamer Pro</h1>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container transition-colors p-xs rounded-lg">help</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container transition-colors p-xs rounded-lg">settings</button>
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional business headshot of a software engineer in a clean, brightly lit corporate office. The user has a friendly expression and is wearing professional attire. The lighting is soft and even, highlighting a modern light-mode office aesthetic with subtle blue and gray tones in the background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVCvjZYa_FsLliDOp0X-mipwP-hRj2GB2s5blmQhiLMaASHIlbZyzZHSpg6HD0TfGCvn3z4BJQPEzwTclSquve8tWRmeLkmVctBTwdydwFQUcg7EyvBfe3rZL7ufXBdff_CKLtZhA7C6vH_oOZDAJRq4d3ftjspDMZcHpy5v4ykyTRJlqMBQJ9w8Xw_jSAYqOu9NC1wUm7wS5pQ1MK6Shr_gSCSl6OQr2rtUkII7ne4egzCDauQGMNGy5CXjOQqaDCzKwjhhRMMQA"/>
+</div>
+</div>
+</div>
+<!-- Tabs -->
+<nav class="flex gap-lg">
+<a class="font-label-md text-label-md text-on-surface-variant pb-1 hover:bg-surface-container transition-colors" href="#">Đổi tên PDF</a>
+<a class="font-label-md text-label-md text-primary border-b-2 border-primary pb-1 font-bold" href="#">Tìm trang trắng</a>
+<a class="font-label-md text-label-md text-on-surface-variant pb-1 hover:bg-surface-container transition-colors" href="#">Xóa trang trắng</a>
+</nav>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col overflow-hidden px-margin py-md space-y-md">
+<!-- Configuration Row -->
+<section class="bg-surface-container-low p-md rounded border border-outline-variant flex flex-wrap items-center gap-xl">
+<!-- Directory Path -->
+<div class="flex flex-col gap-base min-w-[300px] flex-1">
+<label class="font-label-md text-label-md text-on-surface-variant">Đường dẫn thư mục</label>
+<div class="flex gap-xs">
+<input class="flex-1 font-body-md text-body-md px-sm py-xs border border-outline rounded bg-surface-container-lowest focus:ring-2 focus:ring-primary focus:border-primary" readonly="" type="text" value="C:\Users\Documents\Scan_2024\Project_A"/>
+<button class="bg-surface-container-highest px-md py-xs rounded border border-outline-variant font-label-md text-label-md flex items-center gap-xs hover:bg-surface-dim transition-colors">
+<span class="material-symbols-outlined text-[18px]">folder_open</span>
+                        Chọn thư mục
+                    </button>
+</div>
+</div>
+<!-- Threshold Slider -->
+<div class="flex flex-col gap-base min-w-[200px]">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md text-on-surface-variant">Ngưỡng trắng (%)</label>
+<span class="font-mono-sm text-mono-sm font-bold text-primary" id="threshold-val">95%</span>
+</div>
+<input class="w-full h-1.5 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary" max="99" min="85" oninput="document.getElementById('threshold-val').innerText = this.value + '%'" step="1" type="range" value="95"/>
+<div class="flex justify-between text-[10px] text-outline">
+<span>85%</span>
+<span>99%</span>
+</div>
+</div>
+<!-- Ink Checkbox -->
+<div class="flex items-center gap-sm pt-4">
+<input class="w-4 h-4 text-primary border-outline rounded focus:ring-primary" id="ink-check" type="checkbox"/>
+<label class="font-body-md text-body-md text-on-surface" for="ink-check">Bao gồm vết mực nhỏ</label>
+</div>
+</section>
+<!-- Results Table Container -->
+<section class="flex-1 bg-surface-container-lowest border border-outline-variant rounded flex flex-col overflow-hidden">
+<div class="overflow-auto custom-scrollbar flex-1">
+<table class="w-full text-left border-collapse">
+<thead class="sticky top-0 bg-surface-container-high z-10 border-b-2 border-outline-variant">
+<tr>
+<th class="px-sm py-md w-10"><input class="rounded border-outline" type="checkbox"/></th>
+<th class="font-label-md text-label-md px-sm py-md text-on-surface-variant">STT</th>
+<th class="font-label-md text-label-md px-sm py-md text-on-surface-variant">Tên file</th>
+<th class="font-label-md text-label-md px-sm py-md text-on-surface-variant">Số trang</th>
+<th class="font-label-md text-label-md px-sm py-md text-on-surface-variant">Trang trắng phát hiện</th>
+<th class="font-label-md text-label-md px-sm py-md text-on-surface-variant">Xem trước</th>
+<th class="font-label-md text-label-md px-sm py-md text-on-surface-variant">Trạng thái</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md">
+<!-- Row 1 -->
+<tr class="hover:bg-primary-fixed/20 transition-colors border-b border-outline-variant">
+<td class="px-sm py-sm"><input checked="" class="rounded border-outline" type="checkbox"/></td>
+<td class="px-sm py-sm text-on-surface-variant">01</td>
+<td class="px-sm py-sm font-semibold">Bao_cao_tai_chinh_Q3_2023.pdf</td>
+<td class="px-sm py-sm">45</td>
+<td class="px-sm py-sm text-error font-bold">12, 13, 44</td>
+<td class="px-sm py-sm">
+<button class="material-symbols-outlined text-primary hover:bg-surface-container p-xs rounded" title="Xem trước">search</button>
+</td>
+<td class="px-sm py-sm">
+<span class="inline-flex items-center gap-xs bg-secondary-container text-on-secondary-container px-sm py-xs rounded-full font-label-md text-[11px]">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                                    Có trang trắng
+                                </span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-primary-fixed/20 transition-colors border-b border-outline-variant">
+<td class="px-sm py-sm"><input class="rounded border-outline" type="checkbox"/></td>
+<td class="px-sm py-sm text-on-surface-variant">02</td>
+<td class="px-sm py-sm font-semibold">Hop_dong_lao_dong_NV092.pdf</td>
+<td class="px-sm py-sm">12</td>
+<td class="px-sm py-sm text-outline-variant">None</td>
+<td class="px-sm py-sm">
+<button class="material-symbols-outlined text-primary hover:bg-surface-container p-xs rounded" title="Xem trước">search</button>
+</td>
+<td class="px-sm py-sm">
+<span class="inline-flex items-center gap-xs bg-surface-container-high text-on-surface-variant px-sm py-xs rounded-full font-label-md text-[11px]">
+<span class="w-2 h-2 rounded-full bg-outline"></span>
+                                    Sạch
+                                </span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-primary-fixed/20 transition-colors border-b border-outline-variant">
+<td class="px-sm py-sm"><input class="rounded border-outline" type="checkbox"/></td>
+<td class="px-sm py-sm text-on-surface-variant">03</td>
+<td class="px-sm py-sm font-semibold">Tai_lieu_ky_thuat_he_thong.pdf</td>
+<td class="px-sm py-sm">--</td>
+<td class="px-sm py-sm text-error">N/A</td>
+<td class="px-sm py-sm">
+<button class="material-symbols-outlined text-outline-variant cursor-not-allowed p-xs rounded">search</button>
+</td>
+<td class="px-sm py-sm">
+<span class="inline-flex items-center gap-xs bg-error-container text-on-error-container px-sm py-xs rounded-full font-label-md text-[11px]">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+                                    Lỗi
+                                </span>
+</td>
+</tr>
+<!-- Repeat filler rows -->
+<script>
+                            for(let i=4; i<=15; i++) {
+                                document.write(`
+                                <tr class="hover:bg-primary-fixed/20 transition-colors border-b border-outline-variant">
+                                    <td class="px-sm py-sm"><input type="checkbox" class="rounded border-outline"></td>
+                                    <td class="px-sm py-sm text-on-surface-variant">${i < 10 ? '0' + i : i}</td>
+                                    <td class="px-sm py-sm font-semibold">Document_Batch_Scan_${100+i}.pdf</td>
+                                    <td class="px-sm py-sm">32</td>
+                                    <td class="px-sm py-sm text-error font-bold">5, 8</td>
+                                    <td class="px-sm py-sm">
+                                        <button class="material-symbols-outlined text-primary hover:bg-surface-container p-xs rounded">search</button>
+                                    </td>
+                                    <td class="px-sm py-sm">
+                                        <span class="inline-flex items-center gap-xs bg-secondary-container text-on-secondary-container px-sm py-xs rounded-full font-label-md text-[11px]">
+                                            <span class="w-2 h-2 rounded-full bg-secondary"></span>
+                                            Có trang trắng
+                                        </span>
+                                    </td>
+                                </tr>
+                                `);
+                            }
+                         </script>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+<!-- Bottom Action Bar -->
+<footer class="bg-surface-container p-md border-t border-outline-variant flex flex-col gap-sm">
+<!-- Progress Info -->
+<div class="flex justify-between items-center mb-xs">
+<div class="flex items-center gap-md">
+<span class="font-label-md text-label-md text-on-surface-variant">Tiến trình quét: <span class="text-primary font-bold">12/150 files</span></span>
+<span class="font-label-md text-label-md text-secondary">Đã tìm thấy 24 trang trắng</span>
+</div>
+<span class="font-mono-sm text-mono-sm text-on-surface-variant">8% Hoàn thành</span>
+</div>
+<!-- Progress Bar -->
+<div class="w-full bg-surface-variant h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full transition-all duration-500" style="width: 8%"></div>
+</div>
+<!-- Buttons -->
+<div class="flex justify-between items-center mt-xs">
+<div class="flex gap-md">
+<button class="bg-primary text-on-primary px-xl py-sm rounded border border-primary font-label-md text-label-md flex items-center gap-sm hover:brightness-110 active:scale-95 transition-all shadow-sm">
+<span class="material-symbols-outlined">search</span>
+                    Quét trang trắng
+                </button>
+<button class="bg-secondary text-on-secondary px-xl py-sm rounded border border-secondary font-label-md text-label-md flex items-center gap-sm hover:brightness-110 active:scale-95 transition-all shadow-sm">
+<span class="material-symbols-outlined">delete_sweep</span>
+                    Chuyển sang Xóa
+                    <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+<div class="text-on-surface-variant font-label-md text-label-md">
+                © 2024 PDF Utility Office. v2.4.0
+            </div>
+</div>
+</footer>
+<!-- Simple Animation Shader for background depth -->
+<div class="fixed inset-0 pointer-events-none z-[-1] opacity-20">
+
+</div>
+<script>
+        // Micro-interactions
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('mousedown', () => btn.classList.add('opacity-80'));
+            btn.addEventListener('mouseup', () => btn.classList.remove('opacity-80'));
+            btn.addEventListener('mouseleave', () => btn.classList.remove('opacity-80'));
+        });
+
+        // Search highlight mock
+        const searchBtns = document.querySelectorAll('table .material-symbols-outlined');
+        searchBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const row = e.target.closest('tr');
+                row.classList.add('bg-primary-fixed/40');
+                setTimeout(() => row.classList.remove('bg-primary-fixed/40'), 1000);
+            });
+        });
+    </script>
+</body></html>

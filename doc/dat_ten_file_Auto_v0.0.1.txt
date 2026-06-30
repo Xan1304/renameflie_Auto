@@ -1,0 +1,2289 @@
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\main.py
+import sys
+import os
+
+# Đảm bảo đường dẫn module được nhận diện
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+from gui.main_window import MainWindow
+
+def main():
+    app = MainWindow()
+    app.mainloop()
+
+if __name__ == "__main__":
+    main()
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\test_ocr.py
+import os
+from core.ocr import extract_pdf_info
+
+test_folder = r"d:\vibe_coding\dat_ten_file_Auto\test\110"
+count = 0
+if os.path.exists(test_folder):
+    for f in os.listdir(test_folder):
+        if f.lower().endswith(".pdf"):
+            pdf_path = os.path.join(test_folder, f)
+            print(f"Testing {pdf_path}...")
+            result = extract_pdf_info(pdf_path)
+            print(f"Result: {result}")
+            if result.get("error"):
+                print(f"Error detail: {result['error']}")
+            count += 1
+            if count >= 2: break
+else:
+    print(f"Test folder {test_folder} not found.")
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\test_regex.py
+import re
+
+tests = [
+    "An Tây, ngày 01 tháng 02năm 2019",
+    "ngày 01 tháng 02 năm 2019",
+    "An Tay, ngay 01 thang 02nam 2019",
+    "ngày 15 tháng 07 năm 2024"
+]
+
+pattern = r'(?i)ng\D*?(\d{1,2})\D*?th\D*?(\d{1,2})\D*?n\D*?(\d{4})'
+
+with open("test_out2.txt", "w", encoding="utf-8") as f:
+    for t in tests:
+        match = re.search(pattern, t)
+        f.write(f"[{t}] -> {match.groups() if match else 'NO MATCH'}\n")
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\test_regex2.py
+import re
+
+tests = [
+    "An Tây, ngày 01 tháng 02năm 2019",
+    "ngày 01 tháng 02 năm 2019",
+    "An Tay, ngdy 01 thdng 02nam 2019",
+    "ngày 15 tháng 07 năm 2024",
+    "An Tay, ngdy Ol tfng O2ndm 2019",
+    "ngay 12-05-2023",
+    "12/05/2023"
+]
+
+pattern = r'([0-9oOlI]{1,2})[^\d]{1,15}?([0-9oOlI]{1,2})[^\d]{1,15}?(\d{4})'
+
+def clean_num(s):
+    s = s.lower().replace('o', '0').replace('l', '1').replace('i', '1')
+    return int(s)
+
+with open("test_out3.txt", "w", encoding="utf-8") as f:
+    for t in tests:
+        match = re.search(pattern, t, re.IGNORECASE)
+        if match:
+            d, m, y = match.groups()
+            try:
+                d = clean_num(d)
+                m = clean_num(m)
+                y = int(y)
+                f.write(f"[{t}] -> {d}/{m}/{y}\n")
+            except Exception as e:
+                f.write(f"[{t}] -> ERROR {e}\n")
+        else:
+            f.write(f"[{t}] -> NO MATCH\n")
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\core\blank_detector.py
+import fitz
+from PIL import Image
+import os
+
+def detect_blank_pages(pdf_path, brightness_threshold=0.95, include_small_marks=True):
+    """
+    Quét từng trang của PDF, phát hiện trang trắng hoặc gần trắng.
+    
+    Trả về dict:
+    {
+        "total_pages": int,
+        "blank_pages": [1, 3, 5, ...],  # số trang (bắt đầu từ 1)
+        "page_thumbnails": {1: "/path/thumb_p1.png", ...},
+        "error": None hoặc str
+    }
+    """
+    result = {
+        "total_pages": 0,
+        "blank_pages": [],
+        "page_thumbnails": {},
+        "error": None
+    }
+
+    try:
+        doc = fitz.open(pdf_path)
+        result["total_pages"] = len(doc)
+
+        thumb_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "temp_thumbs")
+        os.makedirs(thumb_dir, exist_ok=True)
+        base = os.path.basename(pdf_path)
+
+        for i, page in enumerate(doc):
+            page_num = i + 1  # Hiển thị từ 1
+
+            # Render trang ở 120 DPI (đủ để phân tích, không quá nặng)
+            zoom = 120 / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat)
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            w, h = img.size
+
+            # Lưu thumbnail trang này
+            thumb_name = f"{base}.p{page_num}.png"
+            thumb_path = os.path.join(thumb_dir, thumb_name)
+            thumb = img.copy()
+            thumb.thumbnail((400, 600))
+            thumb.save(thumb_path)
+            result["page_thumbnails"][page_num] = thumb_path
+
+            # ── PHÂN TÍCH TRANG ─────────────────────────────────────
+            # Bỏ viền mép 5% xung quanh (hay có vết máy scan)
+            margin_x = int(w * 0.05)
+            margin_y = int(h * 0.05)
+            img_inner = img.crop((margin_x, margin_y,
+                                   w - margin_x, h - margin_y))
+
+            img_gray = img_inner.convert('L')
+            pixels = list(img_gray.getdata())
+            total = len(pixels)
+
+            # Bước 1: % pixel sáng (> 240/255)
+            bright_count = sum(1 for p in pixels if p > 240)
+            bright_ratio = bright_count / total
+
+            if bright_ratio < brightness_threshold:
+                # Chắc chắn có nội dung → không phải trắng
+                continue
+
+            # Bước 2: Kiểm tra vùng tối liên tục (connected components)
+            # Dùng phương pháp đơn giản: quét hàng ngang
+            # Tìm hàng nào có > 80px liên tục tối (< 180) → có chữ/chữ ký
+            iw, ih = img_gray.size
+            has_content = False
+
+            # Kiểm tra hàng ngang: dòng chữ đánh máy
+            for row in range(0, ih, 3):  # bước nhảy 3px để nhanh hơn
+                dark_run = 0
+                max_dark_run = 0
+                for col in range(iw):
+                    pixel = img_gray.getpixel((col, row))
+                    if pixel < 180:
+                        dark_run += 1
+                        max_dark_run = max(max_dark_run, dark_run)
+                    else:
+                        dark_run = 0
+                if max_dark_run > 80:  # ~1 từ chữ đánh máy
+                    has_content = True
+                    break
+
+            if has_content:
+                continue
+
+            # Kiểm tra vùng tối tập trung (chữ ký, con dấu)
+            # Đếm tổng pixel tối trong từng ô 30x30
+            if include_small_marks:
+                # Chỉ bỏ qua nếu có cụm tối >= 30x30px
+                block_size = 30
+                for row in range(0, ih - block_size, block_size):
+                    for col in range(0, iw - block_size, block_size):
+                        dark_in_block = 0
+                        for r in range(row, row + block_size):
+                            for c in range(col, col + block_size):
+                                if img_gray.getpixel((c, r)) < 150:
+                                    dark_in_block += 1
+                        # Nếu > 15% block là tối → có nội dung thật
+                        if dark_in_block > (block_size * block_size * 0.15):
+                            has_content = True
+                            break
+                    if has_content:
+                        break
+            else:
+                # Không quan tâm vết nhỏ → chỉ dựa brightness_ratio
+                pass
+
+            if not has_content:
+                result["blank_pages"].append(page_num)
+
+        doc.close()
+
+    except Exception as e:
+        result["error"] = str(e)
+
+    return result
+
+
+def remove_blank_pages(pdf_path, pages_to_remove, output_path):
+    """
+    Xóa các trang trong danh sách pages_to_remove (số trang từ 1).
+    Lưu file mới ra output_path.
+    Trả về (success: bool, error: str hoặc None)
+    """
+    try:
+        doc = fitz.open(pdf_path)
+        total = len(doc)
+
+        # Chuyển sang index 0-based, đảo ngược để xóa từ cuối lên
+        indices = sorted(
+            [p - 1 for p in pages_to_remove if 1 <= p <= total],
+            reverse=True)
+
+        for idx in indices:
+            doc.delete_page(idx)
+
+        doc.save(output_path)
+        doc.close()
+        return True, None
+
+    except Exception as e:
+        return False, str(e)
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\core\config.py
+import os
+import json
+
+CONFIG_FILE = "config.json"
+TEMPLATES_FILE = "templates.json"
+
+DEFAULT_CONFIG = {
+    "tesseract_path": r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+}
+
+def load_config():
+    """Tải cấu hình từ config.json. Nếu chưa có thì tạo mới."""
+    if not os.path.exists(CONFIG_FILE):
+        save_config(DEFAULT_CONFIG)
+        return DEFAULT_CONFIG
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            # Merge with default to ensure keys exist
+            config = DEFAULT_CONFIG.copy()
+            config.update(data)
+            return config
+    except Exception as e:
+        print(f"Lỗi khi đọc config: {e}")
+        return DEFAULT_CONFIG.copy()
+
+def save_config(config_data):
+    """Lưu cấu hình vào config.json."""
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Lỗi khi lưu config: {e}")
+
+def load_templates():
+    """Tải danh sách các mẫu tiền tố & số bắt đầu."""
+    if not os.path.exists(TEMPLATES_FILE):
+        return {}
+    try:
+        with open(TEMPLATES_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Lỗi khi đọc templates: {e}")
+        return {}
+
+def save_templates(templates_data):
+    """Lưu danh sách các mẫu."""
+    try:
+        with open(TEMPLATES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(templates_data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Lỗi khi lưu templates: {e}")
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\core\ocr.py
+import os
+import re
+import fitz  # PyMuPDF
+import pytesseract
+from PIL import Image, ImageEnhance
+from datetime import datetime
+from core.config import load_config
+
+def setup_tesseract():
+    """Thiết lập đường dẫn Tesseract từ config."""
+    config = load_config()
+    pytesseract.pytesseract.tesseract_cmd = config.get("tesseract_path", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+
+def is_tesseract_installed():
+    """Kiểm tra xem Tesseract có sẵn sàng hay không."""
+    setup_tesseract()
+    try:
+        pytesseract.get_tesseract_version()
+        return True
+    except Exception:
+        return False
+
+def extract_pdf_info(pdf_path):
+    setup_tesseract()
+    result = {
+        "so_kh": None, "ngay_vb": None,
+        "so_trang": None, "thumbnail_path": None,
+        "error": None,
+        "crop_sokh_path": None, "crop_ngay_path": None, "crop_trang_path": None
+    }
+
+    try:
+        doc = fitz.open(pdf_path)
+        if len(doc) == 0:
+            result["error"] = "File PDF rỗng"
+            return result
+
+        page = doc[0]
+        zoom = 200 / 72.0
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat)
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        w, h = img.size
+
+        # Lưu thumbnail
+        thumb_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp_thumbs")
+        os.makedirs(thumb_dir, exist_ok=True)
+        base = os.path.basename(pdf_path)
+
+        thumbnail = img.copy()
+        thumbnail.thumbnail((1000, 1400))
+        thumb_path = os.path.join(thumb_dir, base + ".thumb.png")
+        thumbnail.save(thumb_path)
+        result["thumbnail_path"] = thumb_path
+
+        # Lưu ảnh crop cho tooltip hover
+        def save_crop(box, suffix, size):
+            cropped = img.crop(box).resize(size, Image.Resampling.LANCZOS)
+            path = os.path.join(thumb_dir, base + f".{suffix}.png")
+            cropped.save(path)
+            return path
+
+        result["crop_sokh_path"]  = save_crop((0, int(h*0.05), int(w*0.38), int(h*0.30)), "sokh",  (320, 160))
+        result["crop_ngay_path"]  = save_crop((int(w*0.45), int(h*0.04), w, int(h*0.22)), "ngay",  (320, 140))
+        result["crop_trang_path"] = save_crop((int(w*0.58), 0, w, int(h*0.06)),            "trang", (200, 70))
+
+        # ── Tiền xử lý ảnh ──────────────────────────────────────────
+        def preprocess(image, scale=2):
+            image = image.resize(
+                (image.width * scale, image.height * scale),
+                Image.Resampling.LANCZOS)
+            gray = image.convert('L')
+            gray = ImageEnhance.Contrast(gray).enhance(2.5)
+            gray = ImageEnhance.Sharpness(gray).enhance(2.0)
+            # Ngưỡng adaptive: dùng 150 cho chữ viết tay (tối hơn)
+            return gray.point(lambda p: 255 if p > 150 else 0)
+
+        # ── OCR Số KH (góc trên TRÁI) ───────────────────────────────
+        img_left = img.crop((0, 0, int(w * 0.38), int(h * 0.5)))
+        text_left = pytesseract.image_to_string(preprocess(img_left), lang='vie+eng')
+
+        # Pattern 1: "Số: 13/..." hoặc "Số 09 -..." (kể cả OCR nhầm S→S6, S→56)
+        patterns_sokh = [
+            r'[Ss][ốoO06ố][\s:\.]*(\d+)',   # Số: 13 / Số 09 / S6: 5
+            r'[Ss](?:ố|o|0|6)[\s:\.]*(\d+)', # dạng unicode tường minh
+            r'\bS[o0O6ố][\s:]*(\d+)',         # fallback ngắn
+        ]
+        for pat in patterns_sokh:
+            m = re.search(pat, text_left)
+            if m:
+                val = int(m.group(1))
+                # Lọc số quá lớn (>999) có thể là số năm bị nhận nhầm
+                if val <= 999:
+                    result["so_kh"] = val
+                    break
+
+        # ── OCR Số trang (góc TRÊN CÙNG bên phải, rất nhỏ) ─────────
+        # Dùng vùng nhỏ hơn (6% chiều cao) để tránh đọc chữ bên dưới
+        # Đã tắt theo yêu cầu user: chỉ để hình thu nhỏ, không ghi số trang tự động
+        # box_trang = (int(w * 0.60), 0, w, int(h * 0.06))
+        # img_trang = img.crop(box_trang)
+        # img_trang_proc = preprocess(img_trang, scale=3)
+        # text_trang = pytesseract.image_to_string(...)
+        result["so_trang"] = None
+
+        # ── OCR Ngày (góc trên PHẢI) ────────────────────────────────
+        img_right = img.crop((int(w * 0.40), 0, w, int(h * 0.33)))
+        text_right = pytesseract.image_to_string(preprocess(img_right), lang='vie+eng')
+
+        def clean_num(s):
+            return int(s.lower()
+                       .replace('o','0').replace('O','0')
+                       .replace('l','1').replace('I','1'))
+
+        ngay_vb = None
+
+        # Pattern 1: "ngày DD tháng MM năm YYYY" (tiếng Việt, OCR có thể sai dấu)
+        m = re.search(
+            r'(?i)ng[aà][yỳ]\s*([0-9oOlI]{1,2})\s*th[aá]ng\s*([0-9oOlI]{1,2})\s*n[aă]m\s*(\d{4})',
+            text_right)
+        if m:
+            try:
+                ngay_vb = datetime(clean_num(m.group(3)), clean_num(m.group(2)), clean_num(m.group(1)))
+            except ValueError:
+                pass
+
+        # Pattern 2: dạng số thô DD MM YYYY (khi OCR không nhận ra chữ)
+        if not ngay_vb:
+            m = re.search(
+                r'([0-9oOlI]{1,2})[^\d]{1,15}?([0-9oOlI]{1,2})[^\d]{1,15}?(\d{4})',
+                text_right, re.IGNORECASE)
+            if m:
+                try:
+                    d = clean_num(m.group(1))
+                    mo = clean_num(m.group(2))
+                    y = int(m.group(3))
+                    if 1 <= d <= 31 and 1 <= mo <= 12 and 1990 <= y <= 2100:
+                        ngay_vb = datetime(y, mo, d)
+                except ValueError:
+                    pass
+
+        # Pattern 3: fallback dd/mm/yyyy hoặc dd-mm-yyyy
+        if not ngay_vb:
+            m = re.search(r'(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', text_right)
+            if m:
+                try:
+                    d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                    if 1 <= d <= 31 and 1 <= mo <= 12 and 1990 <= y <= 2100:
+                        ngay_vb = datetime(y, mo, d)
+                except ValueError:
+                    pass
+
+        result["ngay_vb"] = ngay_vb
+        doc.close()
+        
+    except Exception as e:
+        result["error"] = str(e)
+        
+    return result
+
+def cleanup_thumbnails():
+    """Xóa các thumbnail tạm thời khi tắt app."""
+    thumb_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp_thumbs")
+    if os.path.exists(thumb_dir):
+        for f in os.listdir(thumb_dir):
+            try:
+                os.remove(os.path.join(thumb_dir, f))
+            except:
+                pass
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\core\renamer.py
+import os
+from datetime import datetime
+
+# Biến toàn cục để lưu trạng thái Undo (Tên mới: Tên cũ)
+last_rename_mapping = {}
+
+def sort_files(file_data_list):
+    """
+    Sắp xếp danh sách file theo thứ tự ưu tiên:
+    1. Số KH (int)
+    2. Ngày văn bản (datetime)
+    3. Ngày sửa đổi file (float - timestamp)
+    
+    file_data_list là list các dict:
+    {
+        "path": "đường dẫn đầy đủ",
+        "so_kh": int hoặc None,
+        "ngay_vb": datetime hoặc None,
+        "mtime": float
+    }
+    """
+    def sort_key(item):
+        # Python sort tuple theo thứ tự từ trái qua phải.
+        # Nếu so_kh có giá trị, dùng nó. Nếu không, cho giá trị rất lớn để đẩy xuống dưới.
+        k1 = item.get("so_kh") if item.get("so_kh") is not None else float('inf')
+        
+        # Tương tự với ngày văn bản. Nếu không có, cho ngày ở tương lai xa.
+        k2 = item.get("ngay_vb")
+        if k2 is None:
+            k2 = datetime.max
+            
+        # mtime
+        k3 = item.get("mtime", 0)
+        
+        return (k1, k2, k3)
+        
+    return sorted(file_data_list, key=sort_key)
+
+def generate_new_names(sorted_files, prefix, start_num_str):
+    """
+    Tạo danh sách tên mới dựa vào tiền tố và số bắt đầu.
+    Bỏ qua các file không được tích (checked = False).
+    start_num_str là string để đếm độ dài (vd "043" -> length 3).
+    """
+    num_length = len(start_num_str)
+    try:
+        current_num = int(start_num_str)
+    except ValueError:
+        current_num = 1
+        num_length = max(3, len(start_num_str))
+        
+    result = []
+    
+    for item in sorted_files:
+        if not item.get("checked", True):
+            result.append(None)
+            continue
+            
+        # Định dạng số với padding 0 (leading zeros)
+        num_str = str(current_num).zfill(num_length)
+        new_name = f"{prefix}{num_str}.pdf"
+        result.append(new_name)
+        
+        current_num += 1
+        
+    return result
+
+def execute_rename(rename_plan, folder_path):
+    """
+    Thực hiện đổi tên thực tế.
+    rename_plan là list các dict: {"old_path": str, "new_name": str, "new_path": str}
+    """
+    global last_rename_mapping
+    last_rename_mapping.clear()
+    
+    success_count = 0
+    errors = []
+    
+    # Đổi tên
+    for item in rename_plan:
+        old_path = item["old_path"]
+        new_path = item["new_path"]
+        
+        if old_path == new_path:
+            continue
+            
+        try:
+            # Kiểm tra nếu file đích đã tồn tại
+            if os.path.exists(new_path) and old_path.lower() != new_path.lower():
+                errors.append(f"Lỗi {os.path.basename(old_path)}: File đích {os.path.basename(new_path)} đã tồn tại.")
+                continue
+                
+            os.rename(old_path, new_path)
+            last_rename_mapping[new_path] = old_path
+            success_count += 1
+        except Exception as e:
+            errors.append(f"Lỗi đổi tên {os.path.basename(old_path)}: {str(e)}")
+            
+    return success_count, errors
+
+def undo_last_rename():
+    """
+    Hoàn tác thao tác đổi tên gần nhất.
+    """
+    global last_rename_mapping
+    if not last_rename_mapping:
+        return False, "Không có lịch sử để hoàn tác."
+        
+    success = 0
+    errors = []
+    for new_path, old_path in list(last_rename_mapping.items()): # dùng list() để tránh RuntimeError khi thay đổi dict
+        try:
+            os.rename(new_path, old_path)
+            success += 1
+            # Xóa khỏi dict
+            del last_rename_mapping[new_path]
+        except Exception as e:
+            errors.append(f"Lỗi khôi phục {os.path.basename(new_path)}: {str(e)}")
+            
+    return success, errors
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\gui\dialogs.py
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from PIL import Image, ImageTk
+import os
+import csv
+import glob
+
+from core.config import load_config, save_config, load_templates, save_templates
+
+class SettingsDialog(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Cài đặt")
+        self.geometry("500x150")
+        self.resizable(False, False)
+        
+        self.config = load_config()
+        
+        # UI
+        frame = ttk.Frame(self, padding=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(frame, text="Đường dẫn Tesseract OCR:", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w", pady=(0, 5))
+        
+        self.entry_path = ttk.Entry(frame, width=50)
+        self.entry_path.grid(row=1, column=0, sticky="we", padx=(0, 10))
+        self.entry_path.insert(0, self.config.get("tesseract_path", ""))
+        
+        btn_browse = ttk.Button(frame, text="Duyệt...", command=self.browse_path)
+        btn_browse.grid(row=1, column=1)
+        
+        btn_frame = ttk.Frame(frame)
+        btn_frame.grid(row=2, column=0, columnspan=2, pady=(20, 0), sticky="e")
+        
+        ttk.Button(btn_frame, text="Lưu", command=self.save, style="Success.TButton").pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Hủy", command=self.destroy).pack(side=tk.RIGHT)
+        
+        self.transient(parent)
+        self.grab_set()
+        
+    def browse_path(self):
+        path = filedialog.askopenfilename(
+            title="Chọn file Tesseract OCR",
+            filetypes=[("Executable", "*.exe"), ("All files", "*.*")]
+        )
+        if path:
+            self.entry_path.delete(0, tk.END)
+            self.entry_path.insert(0, os.path.normpath(path))
+            
+    def save(self):
+        self.config["tesseract_path"] = self.entry_path.get()
+        save_config(self.config)
+        self.destroy()
+
+class TemplateDialog(tk.Toplevel):
+    def __init__(self, parent, current_prefix, current_start, apply_callback):
+        super().__init__(parent)
+        self.title("Quản lý Mẫu")
+        self.geometry("400x300")
+        
+        self.apply_callback = apply_callback
+        self.current_prefix = current_prefix
+        self.current_start = current_start
+        self.templates = load_templates()
+        
+        frame = ttk.Frame(self, padding=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Danh sách mẫu
+        self.listbox = tk.Listbox(frame, font=("Segoe UI", 10))
+        self.listbox.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        for name in self.templates:
+            self.listbox.insert(tk.END, name)
+            
+        # Các nút thao tác
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill=tk.X)
+        
+        ttk.Button(btn_frame, text="Lưu hiện tại", command=self.save_current).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Áp dụng", command=self.apply_template).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Xóa", command=self.delete_template).pack(side=tk.LEFT)
+        ttk.Button(btn_frame, text="Đóng", command=self.destroy).pack(side=tk.RIGHT)
+        
+        self.transient(parent)
+        self.grab_set()
+        
+    def save_current(self):
+        name = tk.simpledialog.askstring("Lưu mẫu", "Nhập tên mẫu mới:", parent=self)
+        if name:
+            self.templates[name] = {
+                "prefix": self.current_prefix,
+                "start": self.current_start
+            }
+            save_templates(self.templates)
+            self.listbox.insert(tk.END, name)
+            
+    def apply_template(self):
+        selection = self.listbox.curselection()
+        if selection:
+            name = self.listbox.get(selection[0])
+            data = self.templates[name]
+            self.apply_callback(data["prefix"], data["start"])
+            self.destroy()
+            
+    def delete_template(self):
+        selection = self.listbox.curselection()
+        if selection:
+            name = self.listbox.get(selection[0])
+            del self.templates[name]
+            save_templates(self.templates)
+            self.listbox.delete(selection[0])
+
+class HistoryDialog(tk.Toplevel):
+    def __init__(self, parent, current_folder):
+        super().__init__(parent)
+        self.title("Lịch sử đổi tên")
+        self.geometry("600x400")
+        
+        frame = ttk.Frame(self, padding=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Combobox chọn file log
+        top_frame = ttk.Frame(frame)
+        top_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(top_frame, text="Chọn file log:").pack(side=tk.LEFT)
+        self.cb_log = ttk.Combobox(top_frame, state="readonly", width=40)
+        self.cb_log.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Bảng lịch sử
+        cols = ("time", "old", "new")
+        self.tree = ttk.Treeview(frame, columns=cols, show="headings")
+        self.tree.heading("time", text="Thời gian")
+        self.tree.heading("old", text="Tên cũ")
+        self.tree.heading("new", text="Tên mới")
+        self.tree.column("time", width=150)
+        self.tree.column("old", width=200)
+        self.tree.column("new", width=200)
+        
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Load logs
+        self.log_files = []
+        if current_folder and os.path.exists(current_folder):
+            pattern = os.path.join(current_folder, "rename_log_*.csv")
+            self.log_files = sorted(glob.glob(pattern), reverse=True)
+            
+        if self.log_files:
+            self.cb_log['values'] = [os.path.basename(f) for f in self.log_files]
+            self.cb_log.current(0)
+            self.cb_log.bind("<<ComboboxSelected>>", self.load_log_data)
+            self.load_log_data(None)
+        else:
+            self.cb_log.set("Không có dữ liệu")
+            
+        self.transient(parent)
+        self.grab_set()
+        
+    def load_log_data(self, event):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+            
+        idx = self.cb_log.current()
+        if idx >= 0:
+            log_path = self.log_files[idx]
+            try:
+                with open(log_path, 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        self.tree.insert("", "end", values=(row.get('Thời gian', ''), row.get('Tên cũ', ''), row.get('Tên mới', '')))
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể đọc file log: {e}")
+
+class ThumbnailDialog(tk.Toplevel):
+    def __init__(self, parent, image_path):
+        super().__init__(parent)
+        self.title("Xem trước trang 1")
+        
+        # Bỏ viền window tiêu chuẩn, hoặc giữ viền nhưng bind ESC
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.bind("<FocusOut>", lambda e: self.destroy())
+        
+        try:
+            img = Image.open(image_path)
+            
+            # Tính toán kích thước dựa trên chiều cao màn hình (khoảng 85%)
+            screen_h = parent.winfo_screenheight()
+            target_h = int(screen_h * 0.85)
+            target_w = int(target_h * (img.width / img.height))
+            
+            # Resize ảnh (dùng LANCZOS để mượt hơn)
+            img = img.resize((target_w, target_h), Image.Resampling.LANCZOS)
+            
+            self.tk_image = ImageTk.PhotoImage(img)
+            lbl = tk.Label(self, image=self.tk_image)
+            lbl.pack()
+            
+            # Căn giữa cửa sổ con theo cửa sổ cha
+            self.update_idletasks()
+            w = self.winfo_width()
+            h = self.winfo_height()
+            x = parent.winfo_x() + (parent.winfo_width() // 2) - (w // 2)
+            y = parent.winfo_y() + (parent.winfo_height() // 2) - (h // 2)
+            self.geometry(f"+{x}+{y}")
+            
+        except Exception as e:
+            tk.Label(self, text=f"Lỗi hiển thị ảnh:\n{e}").pack(padx=20, pady=20)
+            
+        self.transient(parent)
+        self.focus_set()
+
+class MultiThumbnailDialog(tk.Toplevel):
+    def __init__(self, parent, title, thumbnails_dict, detected_blanks=None, on_confirm=None):
+        super().__init__(parent)
+        self.title(title)
+        
+        self.detected_blanks = detected_blanks or []
+        self.on_confirm = on_confirm
+        
+        # Kích thước
+        screen_h = parent.winfo_screenheight()
+        target_h = int(screen_h * 0.85)
+        self.geometry(f"520x{target_h}")
+        
+        self.bind("<Escape>", lambda e: self.destroy())
+        
+        # Bottom frame for Confirm button
+        bottom_frame = tk.Frame(self, bg="#FFFFFF", height=60)
+        bottom_frame.pack(side="bottom", fill="x")
+        bottom_frame.pack_propagate(False)
+        
+        btn_confirm = ttk.Button(bottom_frame, text="✔ Xác nhận", style="Success.TButton", command=self._confirm)
+        btn_confirm.pack(side="right", padx=20, pady=10)
+        
+        ttk.Label(bottom_frame, text="* Tick chọn để đánh dấu trang cần xóa", font=("Segoe UI", 9, "italic"), background="#FFFFFF", foreground="#6B7280").pack(side="left", padx=20)
+        
+        # Khu vực cuộn
+        self.canvas = tk.Canvas(self, bg="#F0F2F5", highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg="#F0F2F5")
+        
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+        
+        # Enable mouse wheel scrolling
+        def _on_mousewheel(event):
+            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            
+        def _bind_mouse(event, bind=True):
+            if bind:
+                self.bind_all("<MouseWheel>", _on_mousewheel)
+            else:
+                self.unbind_all("<MouseWheel>")
+                
+        self.bind("<Enter>", lambda e: _bind_mouse(e, True))
+        self.bind("<Leave>", lambda e: _bind_mouse(e, False))
+        
+        # Clean up mousewheel binding on destroy
+        def _on_destroy(event):
+            if event.widget == self:
+                self.unbind_all("<MouseWheel>")
+        self.bind("<Destroy>", _on_destroy)
+        
+        # Chỉnh kích thước scrollable frame bằng width của canvas để nó center
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        
+        def _configure_canvas(event):
+            self.canvas.itemconfig(self.canvas_window, width=event.width)
+        self.canvas.bind("<Configure>", _configure_canvas)
+        
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        
+        self.tk_images = [] # giữ reference ảnh
+        self.page_vars = {} # lưu trạng thái check của từng trang
+        self.page_frames = {}
+        self.page_overlays = {}
+        
+        # Tải từng ảnh
+        for page_num in sorted(thumbnails_dict.keys()):
+            img_path = thumbnails_dict[page_num]
+            if os.path.exists(img_path):
+                try:
+                    img = Image.open(img_path)
+                    # Resize để vừa chiều rộng popup (~450px)
+                    target_w = 420
+                    target_h_img = int(target_w * (img.height / img.width))
+                    img = img.resize((target_w, target_h_img), Image.Resampling.LANCZOS)
+                    tk_img = ImageTk.PhotoImage(img)
+                    self.tk_images.append(tk_img)
+                    
+                    is_blank = page_num in self.detected_blanks
+                    var = tk.BooleanVar(value=is_blank)
+                    self.page_vars[page_num] = var
+                    
+                    frame = tk.Frame(self.scrollable_frame, bg="#FFFFFF", bd=2)
+                    frame.pack(pady=10, padx=10, anchor="center")
+                    self.page_frames[page_num] = frame
+                    
+                    top_bar = tk.Frame(frame, bg="#FFFFFF")
+                    top_bar.pack(fill="x", padx=10, pady=(5, 0))
+                    
+                    lbl_title = tk.Label(top_bar, text=f"Trang {page_num}", font=("Segoe UI", 11, "bold"), bg="#FFFFFF", fg="#374151")
+                    lbl_title.pack(side="left")
+                    
+                    chk = ttk.Checkbutton(top_bar, text="Xóa trang này", variable=var, command=lambda p=page_num: self._toggle_page(p))
+                    chk.pack(side="right")
+                    
+                    img_container = tk.Frame(frame, bg="#FFFFFF")
+                    img_container.pack(padx=8, pady=8)
+                    
+                    lbl_img = tk.Label(img_container, image=tk_img, bg="#FFFFFF")
+                    lbl_img.pack()
+                    
+                    # Lớp phủ dấu X đỏ
+                    overlay = tk.Label(img_container, text="❌", font=("Arial", 72), fg="red", bg="#FFFFFF")
+                    self.page_overlays[page_num] = overlay
+                    
+                    self._toggle_page(page_num) # Cập nhật UI ngay lập tức
+                    
+                except Exception as e:
+                    tk.Label(self.scrollable_frame, text=f"Lỗi tải trang {page_num}: {e}").pack()
+        
+        self.transient(parent)
+        self.focus_set()
+        
+    def _toggle_page(self, page_num):
+        is_selected = self.page_vars[page_num].get()
+        frame = self.page_frames[page_num]
+        overlay = self.page_overlays[page_num]
+        
+        if is_selected:
+            frame.config(highlightbackground="#FCA5A5", highlightcolor="#FCA5A5", highlightthickness=2)
+            overlay.place(relx=0.5, rely=0.5, anchor="center")
+        else:
+            frame.config(highlightbackground="#FFFFFF", highlightcolor="#FFFFFF", highlightthickness=2)
+            overlay.place_forget()
+            
+    def _confirm(self):
+        if self.on_confirm:
+            selected_pages = [p for p, var in self.page_vars.items() if var.get()]
+            self.on_confirm(selected_pages)
+        self.destroy()
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\gui\main_window.py
+import os
+import tkinter as tk
+from tkinter import ttk
+
+from core.ocr import cleanup_thumbnails
+
+class MainWindow(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        
+        self.title("PDF Renamer Pro")
+        self.geometry("1000x700")
+        self.minsize(1000, 700)
+        
+        # Configure fonts and styles
+        self.setup_styles()
+        
+        self.build_ui()
+        
+        # Tự động dọn dẹp ảnh tạm khi tắt
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def setup_styles(self):
+        # Màu nền tổng thể
+        self.configure(bg="#F0F2F5")
+        
+        style = ttk.Style(self)
+        style.theme_use('clam')
+        
+        # Frame nền
+        style.configure("Card.TFrame", background="#FFFFFF", relief="flat")
+        style.configure(".", background="#F0F2F5", font=("Segoe UI", 10))
+        
+        # Header tiêu đề app
+        style.configure("AppTitle.TLabel", 
+            font=("Segoe UI", 14, "bold"), 
+            foreground="#1A56DB",
+            background="#FFFFFF")
+        
+        # Label thường
+        style.configure("TLabel", background="#F0F2F5")
+        
+        # Bảng
+        style.configure("Treeview", 
+            rowheight=38, 
+            font=("Segoe UI", 10),
+            background="#FFFFFF",
+            fieldbackground="#FFFFFF",
+            borderwidth=0)
+        style.configure("Treeview.Heading", 
+            font=("Segoe UI", 10, "bold"),
+            background="#F8FAFC",
+            foreground="#374151",
+            borderwidth=0)
+        style.map("Treeview", background=[("selected", "#DBEAFE")], foreground=[("selected", "#1E40AF")])
+        
+        # Nút Quét & Preview — xanh dương
+        style.configure("Primary.TButton", 
+            background="#1A56DB", foreground="#FFFFFF",
+            font=("Segoe UI", 10, "bold"), padding=(16, 8))
+        style.map("Primary.TButton", background=[("active", "#1E429F")])
+        
+        # Nút Đổi tên ngay — xanh lá
+        style.configure("Success.TButton", 
+            background="#057A55", foreground="#FFFFFF",
+            font=("Segoe UI", 10, "bold"), padding=(16, 8))
+        style.map("Success.TButton", background=[("active", "#046C4E")])
+        
+        # Nút Hoàn tác — vàng cam
+        style.configure("Warning.TButton", 
+            background="#FF8A00", foreground="#FFFFFF",
+            font=("Segoe UI", 10, "bold"), padding=(16, 8))
+        style.map("Warning.TButton", background=[("active", "#E07400")])
+        
+        # Entry
+        style.configure("TEntry", padding=(8, 6))
+        
+        # Combobox  
+        style.configure("TCombobox", padding=(8, 6))
+        
+        # Progressbar xanh lá
+        style.configure("green.Horizontal.TProgressbar", 
+            troughcolor="#E5E7EB", 
+            background="#057A55",
+            thickness=8)
+
+    def build_ui(self):
+        self.configure(bg="#F0F2F5")
+
+        # Header
+        header = tk.Frame(self, bg="#FFFFFF", height=56)
+        header.pack(fill=tk.X)
+        header.pack_propagate(False)
+        tk.Label(header, text="✏  PDF Renamer Pro",
+                 font=("Segoe UI", 13, "bold"),
+                 fg="#1A56DB", bg="#FFFFFF").pack(side=tk.LEFT, padx=20, pady=14)
+
+        # Notebook (tabs)
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
+
+        # Tab 1
+        from gui.tab_rename import RenameTab
+        self.tab_rename = RenameTab(self.notebook, self)
+        self.notebook.add(self.tab_rename, text="  Đổi tên PDF  ")
+
+        # Tab 2
+        from gui.tab_find_blank import FindBlankTab
+        self.tab_find = FindBlankTab(self.notebook, self)
+        self.notebook.add(self.tab_find, text="  Tìm trang trắng  ")
+
+        # Style notebook tabs
+        style = ttk.Style()
+        style.configure("TNotebook", background="#F0F2F5", borderwidth=0)
+        style.configure("TNotebook.Tab",
+                        font=("Segoe UI", 10),
+                        padding=(16, 8),
+                        background="#E5E7EB",
+                        foreground="#6B7280")
+        style.map("TNotebook.Tab",
+                  background=[("selected", "#FFFFFF")],
+                  foreground=[("selected", "#1A56DB")],
+                  expand=[("selected", [1, 1, 1, 0])])
+
+    def on_closing(self):
+        cleanup_thumbnails()
+        self.destroy()
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\gui\table.py
+import os
+import tkinter as tk
+from tkinter import ttk
+
+class ImageTooltip:
+    """Popup ảnh hiện khi hover, ẩn khi rời chuột."""
+    
+    def __init__(self, treeview):
+        self.tv = treeview
+        self.popup = None
+        self.current_img = None
+        self._after_id = None
+    
+    def show(self, img_path, x, y):
+        """Hiện popup ảnh tại tọa độ màn hình (x, y)."""
+        self.hide()
+        if not img_path or not os.path.exists(img_path):
+            return
+        try:
+            from PIL import Image, ImageTk
+            img = Image.open(img_path)
+            
+            self.popup = tk.Toplevel(self.tv)
+            self.popup.wm_overrideredirect(True)  # Không có border/titlebar
+            self.popup.wm_attributes("-topmost", True)
+            self.popup.configure(bg="#1F2937")
+            
+            # Border effect
+            outer = tk.Frame(self.popup, bg="#374151", padx=2, pady=2)
+            outer.pack()
+            
+            photo = ImageTk.PhotoImage(img)
+            lbl = tk.Label(outer, image=photo, bg="#FFFFFF")
+            lbl.image = photo  # Giữ tham chiếu
+            lbl.pack()
+            
+            self.current_img = photo
+            
+            # Đặt vị trí popup: ưu tiên hiện bên phải con trỏ, tránh ra ngoài màn hình
+            self.popup.update_idletasks()
+            pw = self.popup.winfo_width()
+            ph = self.popup.winfo_height()
+            sw = self.tv.winfo_screenwidth()
+            sh = self.tv.winfo_screenheight()
+            
+            px = x + 16
+            py = y + 8
+            if px + pw > sw: px = x - pw - 8
+            if py + ph > sh: py = y - ph - 8
+            
+            self.popup.geometry(f"+{px}+{py}")
+            
+        except Exception as e:
+            self.hide()
+    
+    def hide(self):
+        if self.popup:
+            try:
+                self.popup.destroy()
+            except:
+                pass
+            self.popup = None
+            self.current_img = None
+
+class CustomTable(ttk.Treeview):
+    def __init__(self, parent, on_recalculate_names, on_view_thumbnail):
+        self.columns = ("updown", "check", "stt", "old", "sokh", "ngay", "sotrang", "new", "status", "view")
+        super().__init__(parent, columns=self.columns, show="headings", selectmode="browse")
+        
+        self.on_recalculate = on_recalculate_names
+        self.on_view = on_view_thumbnail
+        
+        # Cấu hình các cột
+        self.heading("updown", text="☰")
+        self.column("updown", width=40, anchor="center")
+        
+        self.heading("check", text="☑")
+        self.column("check", width=40, anchor="center")
+        
+        self.heading("stt", text="STT")
+        self.column("stt", width=50, anchor="center")
+        
+        self.heading("old", text="Tên file gốc")
+        self.column("old", width=150, anchor="w")
+        
+        self.heading("sokh", text="Số KH")
+        self.column("sokh", width=80, anchor="center")
+        
+        self.heading("ngay", text="Ngày")
+        self.column("ngay", width=100, anchor="center")
+        
+        self.heading("sotrang", text="Trang")
+        self.column("sotrang", width=50, anchor="center")
+        
+        self.heading("new", text="Tên file mới")
+        self.column("new", width=200, anchor="w")
+        
+        self.heading("status", text="Trạng thái")
+        self.column("status", width=150, anchor="center")
+        
+        self.heading("view", text="Xem")
+        self.column("view", width=50, anchor="center")
+        
+        # Tags cho zebra striping và màu sắc
+        self.tag_configure("even", background="#F8FAFC")
+        self.tag_configure("odd", background="#FFFFFF")
+        
+        # Bắt sự kiện kéo thả và click
+        self.bind("<ButtonPress-1>", self.on_press)
+        self.bind("<B1-Motion>", self.on_motion)
+        self.bind("<ButtonRelease-1>", self.on_release)
+        
+        self.file_data_map = {} # map item_id -> dict dữ liệu file
+        self.editing_entry = None
+        self.drag_item = None
+        self.drag_y = 0
+        
+        self.bind("<<TreeviewSelect>>", self._on_select)
+        self.on_select_callback = None
+        
+        self.tooltip = ImageTooltip(self)
+        self._hovered_item = None
+        self._hovered_col = None
+
+        self.bind("<Motion>", self._on_motion_hover)
+        self.bind("<Leave>", self._on_leave_hover)
+
+    def _on_motion_hover(self, event):
+        """Khi di chuột trong bảng — kiểm tra có đang ở cột Số KH/Ngày/Trang không."""
+        if self.editing_entry:
+            self.tooltip.hide()
+            return
+            
+        region = self.identify_region(event.x, event.y)
+        if region != "cell":
+            self.tooltip.hide()
+            return
+        
+        item_id = self.identify_row(event.y)
+        col    = self.identify_column(event.x)  # "#1", "#2", ...
+        col_idx = int(col[1:]) - 1  # 0-based
+        
+        # Chỉ xử lý cột Số KH(4), Ngày(5), Trang(6)
+        if col_idx not in (4, 5, 6):
+            self.tooltip.hide()
+            self._hovered_item = None
+            return
+        
+        # Nếu đang hover cùng ô → không làm gì (tránh flicker)
+        if item_id == self._hovered_item and col == self._hovered_col:
+            return
+        
+        self._hovered_item = item_id
+        self._hovered_col  = col
+        
+        data = self.file_data_map.get(item_id)
+        if not data:
+            self.tooltip.hide()
+            return
+        
+        # Lấy đúng ảnh crop tương ứng với cột
+        crop_map = {
+            4: "crop_sokh_path",
+            5: "crop_ngay_path",
+            6: "crop_trang_path",
+        }
+        img_path = data.get(crop_map[col_idx])
+        
+        # Tọa độ màn hình
+        x_screen = event.x_root
+        y_screen = event.y_root
+        
+        self.tooltip.show(img_path, x_screen, y_screen)
+
+    def _on_leave_hover(self, event):
+        """Khi chuột rời khỏi bảng — ẩn tooltip."""
+        self.tooltip.hide()
+        self._hovered_item = None
+        self._hovered_col  = None
+
+    def _on_select(self, event):
+        selected = self.selection()
+        if selected and self.on_select_callback:
+            item_id = selected[0]
+            data = self.file_data_map.get(item_id)
+            if data:
+                self.on_select_callback(data)
+
+    def insert_row(self, file_data):
+        """Thêm một dòng dữ liệu vào bảng."""
+        item_id = self.insert("", "end")
+        self.file_data_map[item_id] = file_data
+        self.update_row_display(item_id)
+        self.apply_zebra_stripes()
+        return item_id
+        
+    def update_row_display(self, item_id):
+        """Cập nhật hiển thị của 1 dòng dựa trên dữ liệu."""
+        data = self.file_data_map.get(item_id)
+        if not data: return
+        
+        check_str = "☑" if data.get("checked", True) else "☐"
+        status = data.get("status_text", "")
+        
+        self.item(item_id, values=(
+            "☰", 
+            check_str, 
+            data.get("stt", ""), 
+            data.get("old_name", ""),
+            data.get("so_kh", "") or "",
+            data.get("ngay_str", ""),
+            str(data.get("so_trang")) if data.get("so_trang") else "🖼️",
+            data.get("new_name", ""),
+            status,
+            "🔍"
+        ))
+
+    def update_row_by_data(self, data):
+        """Tìm item_id chứa data và update giao diện."""
+        for item_id, d in self.file_data_map.items():
+            if d is data:
+                self.update_row_display(item_id)
+                break
+
+    def get_all_data(self):
+        """Lấy danh sách dữ liệu theo thứ tự hiển thị hiện tại."""
+        result = []
+        for item_id in self.get_children():
+            result.append(self.file_data_map[item_id])
+        return result
+
+    def apply_zebra_stripes(self):
+        """Áp dụng màu nền xen kẽ."""
+        for i, item in enumerate(self.get_children()):
+            tags = ("even",) if i % 2 == 0 else ("odd",)
+            self.item(item, tags=tags)
+
+    def on_press(self, event):
+        region = self.identify_region(event.x, event.y)
+        if region == "cell":
+            self.drag_item = self.identify_row(event.y)
+            self.drag_y = event.y
+
+    def on_motion(self, event):
+        if not self.drag_item: return
+        # Nếu di chuyển chuột ít hơn 5px thì bỏ qua
+        if abs(event.y - self.drag_y) < 5: return
+        
+        target = self.identify_row(event.y)
+        if target and target != self.drag_item:
+            idx = self.index(target)
+            self.move(self.drag_item, self.parent(self.drag_item), idx)
+
+    def on_release(self, event):
+        if self.drag_item:
+            # Nếu đã kéo đi xa hơn 5px (Drag & Drop)
+            if abs(event.y - self.drag_y) >= 5:
+                self.apply_zebra_stripes()
+                self.on_recalculate()
+                self.drag_item = None
+                return # Bỏ qua click
+                
+        self.drag_item = None
+        self.handle_click(event)
+
+    def handle_click(self, event):
+        """Xử lý sự kiện click thật sự trên các cột đặc biệt."""
+        if self.editing_entry:
+            self.editing_entry.destroy()
+            self.editing_entry = None
+            
+        region = self.identify_region(event.x, event.y)
+        if region != "cell":
+            return
+            
+        column = self.identify_column(event.x)
+        item_id = self.identify_row(event.y)
+        
+        if not item_id:
+            return
+            
+        col_idx = int(column[1:]) - 1
+        data = self.file_data_map[item_id]
+        
+        # Cột ☑
+        if col_idx == 1:
+            data["checked"] = not data.get("checked", True)
+            self.update_row_display(item_id)
+            self.on_recalculate()
+            
+        # Cột Tên file mới
+        elif col_idx == 7:
+            self.start_edit(item_id, column, "new_name")
+                
+        # Cột Xem 🔍
+        elif col_idx == 9:
+            if data.get("thumbnail_path"):
+                self.on_view(data["thumbnail_path"])
+
+    def start_edit(self, item_id, column, field_name):
+        self.tooltip.hide()
+        bbox = self.bbox(item_id, column)
+        if not bbox: return
+        
+        x, y, w, h = bbox
+        data = self.file_data_map[item_id]
+        
+        entry = ttk.Entry(self)
+        entry.place(x=x, y=y, width=w, height=h)
+        entry.insert(0, data.get(field_name, "") or "")
+        entry.focus_set()
+        
+        def on_save(event=None):
+            new_val = entry.get().strip()
+            
+            if field_name == "so_kh":
+                if new_val:
+                    try: data["so_kh"] = int(new_val)
+                    except ValueError: pass
+                else: data["so_kh"] = None
+            elif field_name == "so_trang":
+                if new_val:
+                    try: data["so_trang"] = int(new_val)
+                    except ValueError: pass
+                else: data["so_trang"] = None
+            elif field_name == "ngay_str":
+                data["ngay_str"] = new_val
+                if new_val:
+                    try:
+                        from datetime import datetime
+                        data["ngay_vb"] = datetime.strptime(new_val, "%d/%m/%Y")
+                    except Exception:
+                        pass
+                else: data["ngay_vb"] = None
+            elif field_name == "new_name":
+                if new_val == "":
+                    data["manual_edit"] = False
+                else:
+                    data["new_name"] = new_val
+                    data["manual_edit"] = True 
+                
+            entry.destroy()
+            self.editing_entry = None
+            self.update_row_display(item_id)
+            self.on_recalculate()
+            
+        entry.bind("<Return>", on_save)
+        entry.bind("<FocusOut>", on_save)
+        entry.bind("<Escape>", lambda e: entry.destroy())
+        
+        self.editing_entry = entry
+
+    def clear_all(self):
+        for item in self.get_children():
+            self.delete(item)
+        self.file_data_map.clear()
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\gui\tab_find_blank.py
+import os
+import threading
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from PIL import Image, ImageTk
+
+from core.blank_detector import detect_blank_pages, remove_blank_pages
+
+class FindBlankTab(tk.Frame):
+    def __init__(self, parent, main_window):
+        super().__init__(parent, bg="#F0F2F5")
+        self.main_window = main_window
+        self.scan_results = []   # Kết quả sau khi quét xong
+        self.is_processing = False
+        self.last_output_paths = {}
+        self._build_ui()
+
+    def _build_ui(self):
+        # ── Khu vực cấu hình ────────────────────────────────────────
+        config_card = tk.Frame(self, bg="#FFFFFF", relief="flat", bd=1)
+        config_card.pack(fill=tk.X, padx=16, pady=(12, 8))
+
+        inner = tk.Frame(config_card, bg="#FFFFFF")
+        inner.pack(fill=tk.X, padx=16, pady=12)
+
+        # Hàng 1: labels
+        tk.Label(inner, text="Đường dẫn thư mục", fg="#6B7280",
+                 bg="#FFFFFF", font=("Segoe UI", 9)).grid(
+                     row=0, column=0, sticky="w")
+        tk.Label(inner, text="Ngưỡng trắng (%)", fg="#6B7280",
+                 bg="#FFFFFF", font=("Segoe UI", 9)).grid(
+                     row=0, column=2, sticky="w", padx=(24, 0))
+
+        # Hàng 2: controls
+        folder_frame = tk.Frame(inner, bg="#FFFFFF")
+        folder_frame.grid(row=1, column=0, sticky="ew", pady=(2, 0))
+
+        self.lbl_folder = tk.Label(
+            folder_frame,
+            text="Chưa chọn thư mục",
+            fg="#9CA3AF", bg="#F3F4F6",
+            font=("Segoe UI", 9),
+            anchor="w", padx=8,
+            relief="flat", bd=1, width=50)
+        self.lbl_folder.pack(side=tk.LEFT, ipady=6)
+
+        ttk.Button(folder_frame, text="📁 Chọn thư mục",
+                   command=self._select_folder).pack(
+                       side=tk.LEFT, padx=(8, 0))
+
+        # Slider ngưỡng
+        slider_frame = tk.Frame(inner, bg="#FFFFFF")
+        slider_frame.grid(row=1, column=2, sticky="w",
+                          padx=(24, 0), pady=(2, 0))
+
+        tk.Label(slider_frame, text="85%", fg="#9CA3AF",
+                 bg="#FFFFFF", font=("Segoe UI", 8)).pack(side=tk.LEFT)
+
+        self.threshold_var = tk.DoubleVar(value=95)
+        slider = ttk.Scale(slider_frame, from_=85, to=99,
+                           variable=self.threshold_var,
+                           orient="horizontal", length=140)
+        slider.pack(side=tk.LEFT, padx=4)
+
+        tk.Label(slider_frame, text="99%", fg="#9CA3AF",
+                 bg="#FFFFFF", font=("Segoe UI", 8)).pack(side=tk.LEFT)
+
+        self.lbl_threshold = tk.Label(
+            slider_frame, text="95%",
+            fg="#1A56DB", bg="#FFFFFF",
+            font=("Segoe UI", 9, "bold"))
+        self.lbl_threshold.pack(side=tk.LEFT, padx=(8, 0))
+
+        self.threshold_var.trace_add(
+            "write",
+            lambda *a: self.lbl_threshold.config(
+                text=f"{int(self.threshold_var.get())}%"))
+
+        # Checkbox vết mực nhỏ
+        self.include_marks_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            inner,
+            text="Bao gồm vết mực nhỏ",
+            variable=self.include_marks_var
+        ).grid(row=1, column=4, padx=(24, 0), sticky="w")
+
+        inner.columnconfigure(0, weight=1)
+
+        # ── Bảng kết quả ────────────────────────────────────────────
+        table_card = tk.Frame(self, bg="#FFFFFF", relief="flat", bd=1)
+        table_card.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 8))
+
+        cols = ("check", "stt", "filename", "total_pages",
+                "blank_pages", "preview", "status")
+        self.tree = ttk.Treeview(table_card, columns=cols,
+                                  show="headings", selectmode="browse")
+
+        self.tree.heading("check",       text="☑")
+        self.tree.heading("stt",         text="STT")
+        self.tree.heading("filename",    text="Tên file")
+        self.tree.heading("total_pages", text="Số trang")
+        self.tree.heading("blank_pages", text="Trang trắng phát hiện")
+        self.tree.heading("preview",     text="Xem trước")
+        self.tree.heading("status",      text="Trạng thái")
+
+        self.tree.column("check",       width=40,  anchor="center")
+        self.tree.column("stt",         width=50,  anchor="center")
+        self.tree.column("filename",    width=280, anchor="w")
+        self.tree.column("total_pages", width=80,  anchor="center")
+        self.tree.column("blank_pages", width=200, anchor="center")
+        self.tree.column("preview",     width=80,  anchor="center")
+        self.tree.column("status",      width=130, anchor="center")
+
+        self.tree.tag_configure("even", background="#F8FAFC")
+        self.tree.tag_configure("odd",  background="#FFFFFF")
+
+        sb = ttk.Scrollbar(table_card, orient="vertical",
+                           command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.tree.bind("<ButtonRelease-1>", self._on_click)
+
+        self._item_data = {}  # item_id → result dict
+
+        # ── Thanh dưới cùng ─────────────────────────────────────────
+        bottom = tk.Frame(self, bg="#FFFFFF", height=90)
+        bottom.pack(fill=tk.X, side=tk.BOTTOM)
+        bottom.pack_propagate(False)
+
+        # Phải: nút (Pack trước để đảm bảo đủ không gian)
+        btn_frame = tk.Frame(bottom, bg="#FFFFFF")
+        btn_frame.pack(side=tk.RIGHT, padx=20, pady=12)
+
+        self.btn_undo = ttk.Button(
+            btn_frame, text="↩ Hoàn tác",
+            style="Warning.TButton",
+            command=self._do_undo,
+            state=tk.DISABLED)
+        self.btn_undo.pack(side=tk.RIGHT, padx=(8, 0))
+
+        self.btn_save = ttk.Button(
+            btn_frame, text="💾 Lưu",
+            style="Success.TButton",
+            command=self._do_delete,
+            state=tk.DISABLED)
+        self.btn_save.pack(side=tk.RIGHT, padx=(8, 0))
+
+        self.btn_scan = ttk.Button(
+            btn_frame, text="🔍 Quét trang trắng",
+            style="Primary.TButton",
+            command=self._start_scan)
+        self.btn_scan.pack(side=tk.RIGHT)
+
+        # Trái: Khu vực trạng thái và lưu
+        left_bottom = tk.Frame(bottom, bg="#FFFFFF")
+        left_bottom.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=20, pady=8)
+
+        # Cấu hình lưu
+        save_frame = tk.Frame(left_bottom, bg="#FFFFFF")
+        save_frame.pack(anchor="w", pady=(0, 4))
+        
+        self.save_mode = tk.StringVar(value="overwrite")
+        
+        tk.Radiobutton(
+            save_frame,
+            text="Ghi đè file gốc",
+            variable=self.save_mode, value="overwrite",
+            bg="#FFFFFF", font=("Segoe UI", 9),
+            command=self._on_mode_change).pack(side=tk.LEFT)
+
+        self.lbl_warning = tk.Label(
+            save_frame, text="(Thao tác này không thể hoàn tác)",
+            fg="#DC2626", bg="#FFFFFF", font=("Segoe UI", 9, "italic")
+        )
+        self.lbl_warning.pack(side=tk.LEFT, padx=(4, 12))
+
+        tk.Radiobutton(
+            save_frame,
+            text="Lưu vào thư mục mới",
+            variable=self.save_mode, value="new_folder",
+            bg="#FFFFFF", font=("Segoe UI", 9),
+            command=self._on_mode_change).pack(side=tk.LEFT)
+            
+        tk.Label(save_frame, text="Tên thư mục:",
+                 fg="#6B7280", bg="#FFFFFF",
+                 font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(12, 4))
+
+        self.entry_subfolder = ttk.Entry(save_frame, width=14)
+        self.entry_subfolder.insert(0, "cleaned")
+        self.entry_subfolder.pack(side=tk.LEFT)
+        self.entry_subfolder.config(state=tk.DISABLED)
+
+        # Status and progress
+        self.lbl_status = tk.Label(
+            left_bottom, text="Sẵn sàng",
+            fg="#6B7280", bg="#FFFFFF", font=("Segoe UI", 9))
+        self.lbl_status.pack(anchor="w")
+
+        self.progress_var = tk.DoubleVar()
+        self.progress = ttk.Progressbar(
+            left_bottom, variable=self.progress_var,
+            maximum=100,
+            style="green.Horizontal.TProgressbar",
+            length=300)
+        self.progress.pack(anchor="w", pady=(2, 0))
+
+    # ── Helpers ─────────────────────────────────────────────────────
+    def _select_folder(self):
+        folder = filedialog.askdirectory(title="Chọn thư mục PDF")
+        if folder:
+            self.current_folder = folder
+            display = folder if len(folder) <= 55 else "..." + folder[-52:]
+            self.lbl_folder.config(text=display, fg="#1F2937")
+
+    def _start_scan(self):
+        if self.is_processing: return
+        if not hasattr(self, "current_folder") or not self.current_folder:
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn thư mục trước.")
+            return
+
+        # Xóa bảng cũ
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        self._item_data.clear()
+        self.scan_results.clear()
+        self.last_output_paths.clear()
+
+        self.is_processing = True
+        self.btn_scan.config(state=tk.DISABLED)
+        self.btn_save.config(state=tk.DISABLED)
+        self.btn_undo.config(state=tk.DISABLED)
+
+        thread = threading.Thread(target=self._scan_thread, daemon=True)
+        thread.start()
+
+    def _scan_thread(self):
+        folder = self.current_folder
+        threshold = self.threshold_var.get() / 100.0
+        include_marks = self.include_marks_var.get()
+
+        pdf_files = sorted([
+            f for f in os.listdir(folder)
+            if f.lower().endswith(".pdf")])
+        total = len(pdf_files)
+
+        for i, fname in enumerate(pdf_files):
+            path = os.path.join(folder, fname)
+            self.after(0, self._update_status,
+                       i + 1, total,
+                       f"Đang quét {i+1}/{total}: {fname}")
+
+            info = detect_blank_pages(path, threshold, include_marks)
+            info["filename"] = fname
+            info["path"] = path
+            info["checked"] = len(info["blank_pages"]) > 0
+
+            self.after(0, self._append_row, info)
+            self.scan_results.append(info)
+
+            pct = int((i + 1) / total * 100)
+            self.after(0, lambda v=pct: self.progress_var.set(v))
+
+        self.after(0, self._finish_scan)
+
+    def _append_row(self, info):
+        blank = info["blank_pages"]
+        has_blank = len(blank) > 0
+        has_error = bool(info.get("error"))
+
+        check_str  = "☑" if info["checked"] else "☐"
+        blank_str  = (", ".join(f"Trang {p}" for p in blank)
+                      if blank else ("N/A" if has_error else "None"))
+        total_str  = str(info["total_pages"]) if not has_error else "--"
+        status_str = ("🟢 Có trang trắng" if has_blank
+                      else ("❌ Lỗi đọc" if has_error else "⚪ Sạch"))
+
+        idx = len(self._item_data) + 1
+        tag = "even" if idx % 2 == 0 else "odd"
+        item_id = self.tree.insert(
+            "", "end", tags=(tag,),
+            values=(check_str, f"{idx:02d}", info["filename"],
+                    total_str, blank_str, "🔍", status_str))
+        self._item_data[item_id] = info
+
+    def _update_status(self, current, total, text):
+        blank_found = sum(
+            1 for r in self.scan_results if r["blank_pages"])
+        self.lbl_status.config(
+            text=f"{text}  |  Đã tìm thấy {blank_found} file có trang trắng")
+
+    def _finish_scan(self):
+        self.is_processing = False
+        self.btn_scan.config(state=tk.NORMAL)
+        self._update_total_status()
+
+    def _on_click(self, event):
+        region = self.tree.identify_region(event.x, event.y)
+        if region != "cell": return
+        col = self.tree.identify_column(event.x)
+        item_id = self.tree.identify_row(event.y)
+        if not item_id: return
+        col_idx = int(col[1:]) - 1
+        data = self._item_data.get(item_id)
+        if not data: return
+
+        # Cột checkbox (0)
+        if col_idx == 0:
+            data["checked"] = not data["checked"]
+            vals = list(self.tree.item(item_id, "values"))
+            vals[0] = "☑" if data["checked"] else "☐"
+            self.tree.item(item_id, values=vals)
+            self._update_total_status()
+
+        # Cột xem trước (5)
+        elif col_idx == 5:
+            if data.get("page_thumbnails"):
+                from gui.dialogs import MultiThumbnailDialog
+                
+                def on_confirm(selected_pages):
+                    data["blank_pages"] = sorted(selected_pages)
+                    # Cập nhật UI bảng
+                    vals = list(self.tree.item(item_id, "values"))
+                    blank_str = (", ".join(f"Trang {p}" for p in data["blank_pages"])
+                                 if data["blank_pages"] else "None")
+                    vals[4] = blank_str
+                    
+                    # Nếu có trang được chọn, tự động tick file đó, ngược lại bỏ tick
+                    data["checked"] = len(data["blank_pages"]) > 0
+                    vals[0] = "☑" if data["checked"] else "☐"
+                    
+                    # Update status column
+                    vals[6] = "🟢 Có trang trắng" if data["blank_pages"] else "⚪ Sạch"
+                    
+                    self.tree.item(item_id, values=vals)
+                    
+                    # Cập nhật tổng số trên thanh trạng thái
+                    self._update_total_status()
+
+                MultiThumbnailDialog(
+                    self.main_window, 
+                    f"Xem trước: {data['filename']}", 
+                    data["page_thumbnails"], 
+                    detected_blanks=data.get("blank_pages", []),
+                    on_confirm=on_confirm
+                )
+
+    def _update_total_status(self):
+        total_files = len(self.scan_results)
+        total_pages = sum(r.get("total_pages", 0) for r in self.scan_results)
+        total_blank = sum(len(r.get("blank_pages", [])) for r in self.scan_results)
+        
+        self.lbl_status.config(
+            text=f"Quét xong. Tổng cộng: {total_files} file | {total_pages} trang | {total_blank} trang trắng")
+            
+        has_any = any(r.get("checked") and r.get("blank_pages") for r in self.scan_results)
+        self.btn_save.config(state=tk.NORMAL if has_any else tk.DISABLED)
+
+    def _on_mode_change(self):
+        if self.save_mode.get() == "new_folder":
+            self.entry_subfolder.config(state=tk.NORMAL)
+            self.lbl_warning.config(text="")
+            if hasattr(self, 'last_output_paths') and self.last_output_paths:
+                self.btn_undo.config(state=tk.NORMAL)
+        else:
+            self.entry_subfolder.config(state=tk.DISABLED)
+            self.lbl_warning.config(text="(Thao tác này không thể hoàn tác)")
+            if hasattr(self, 'btn_undo'):
+                self.btn_undo.config(state=tk.DISABLED)
+
+    def _do_delete(self):
+        checked = [(iid, d) for iid, d in self._item_data.items() if d.get("checked") and d.get("blank_pages")]
+        if not checked:
+            messagebox.showinfo("Thông báo", "Không có file nào được chọn để xóa trang trắng.")
+            return
+
+        mode = self.save_mode.get()
+        if mode == "overwrite":
+            confirm = messagebox.askyesno(
+                "Xác nhận",
+                f"Sẽ GHI ĐÈ {len(checked)} file gốc.\nThao tác này KHÔNG THỂ hoàn tác.\n\nTiếp tục?")
+            if not confirm: return
+
+        self.btn_save.config(state=tk.DISABLED)
+        self.btn_undo.config(state=tk.DISABLED)
+        self.btn_scan.config(state=tk.DISABLED)
+        thread = threading.Thread(
+            target=self._delete_thread,
+            args=(checked, mode),
+            daemon=True)
+        thread.start()
+
+    def _delete_thread(self, checked_items, mode):
+        subfolder = self.entry_subfolder.get().strip() or "cleaned"
+        total = len(checked_items)
+        self.last_output_paths.clear()
+
+        for i, (item_id, data) in enumerate(checked_items):
+            fname   = data["filename"]
+            src     = data["path"]
+            blank_p = data["blank_pages"]
+
+            self.after(0, self.lbl_status.config,
+                       {"text": f"Đang xử lý {i+1}/{total}: {fname}"})
+
+            if mode == "overwrite":
+                import tempfile, shutil
+                tmp = src + ".tmp_clean.pdf"
+                ok, err = remove_blank_pages(src, blank_p, tmp)
+                if ok:
+                    shutil.move(tmp, src)
+                    out_path = src
+                else:
+                    out_path = None
+            else:
+                out_dir = os.path.join(self.current_folder, subfolder)
+                os.makedirs(out_dir, exist_ok=True)
+                out_path = os.path.join(out_dir, fname)
+                ok, err = remove_blank_pages(src, blank_p, out_path)
+
+            status = "✅ Hoàn tất" if ok else f"❌ Lỗi: {err}"
+            if ok and out_path:
+                self.last_output_paths[src] = {"out": out_path, "mode": mode}
+
+            self.after(0, self._update_row_status, item_id, status)
+            pct = int((i + 1) / total * 100)
+            self.after(0, lambda v=pct: self.progress_var.set(v))
+
+        self.after(0, self._finish_delete, mode)
+
+    def _update_row_status(self, item_id, status):
+        vals = list(self.tree.item(item_id, "values"))
+        vals[6] = status  # Update column 6 (Status)
+        self.tree.item(item_id, values=vals)
+
+    def _finish_delete(self, mode):
+        done = sum(1 for src, info in self.last_output_paths.items() if info["mode"] == mode)
+        self.lbl_status.config(
+            text=f"Hoàn tất! Đã lưu {done} file.")
+        
+        self.btn_scan.config(state=tk.NORMAL)
+        
+        if mode == "new_folder" and self.last_output_paths:
+            self.btn_undo.config(state=tk.NORMAL)
+
+        if done > 0:
+            messagebox.showinfo("Kết quả", f"Đã xóa trang trắng thành công và lưu {done} file PDF.")
+            # Clear table giống tab đổi tên
+            for item in self.tree.get_children():
+                self.tree.delete(item)
+            self._item_data.clear()
+            self.scan_results.clear()
+            self.btn_save.config(state=tk.DISABLED)
+            self.lbl_status.config(text=f"Đã lưu thành công {done} file. Vui lòng quét lại nếu cần.")
+        else:
+            self.btn_save.config(state=tk.NORMAL)
+
+    def _do_undo(self):
+        if not self.last_output_paths: return
+        confirm = messagebox.askyesno(
+            "Hoàn tác",
+            "Xóa các file đã tạo trong thư mục mới?")
+        if not confirm: return
+
+        removed = 0
+        for src, info in self.last_output_paths.items():
+            if info["mode"] == "new_folder":
+                try:
+                    if os.path.exists(info["out"]):
+                        os.remove(info["out"])
+                        removed += 1
+                except Exception:
+                    pass
+
+        self.last_output_paths.clear()
+        self.btn_undo.config(state=tk.DISABLED)
+        messagebox.showinfo("Hoàn tác", f"Đã xóa {removed} file khỏi thư mục mới.")
+
+    def get_results(self):
+        return self.scan_results
+
+
+FILE: D:\vibe_coding\dat_ten_file_Auto\gui\tab_rename.py
+import os
+import threading
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from datetime import datetime
+
+from core.ocr import extract_pdf_info, is_tesseract_installed
+from core.renamer import sort_files, generate_new_names, execute_rename, undo_last_rename
+from gui.table import CustomTable
+from gui.dialogs import ThumbnailDialog
+
+class RenameTab(tk.Frame):
+    def __init__(self, parent, main_window):
+        super().__init__(parent, bg="#F0F2F5")
+        self.main_window = main_window
+        
+        self.current_folder = ""
+        self.pdf_files = []
+        self.is_processing = False
+        self.cancel_scan = False
+        
+        self._build_ui()
+
+    def _build_ui(self):
+        # ── Welcome Frame ──
+        self.welcome_frame = tk.Frame(self, bg="#F0F2F5")
+        self.welcome_frame.pack(fill=tk.BOTH, expand=True)
+
+        inner_welcome = tk.Frame(self.welcome_frame, bg="#F0F2F5")
+        inner_welcome.place(relx=0.5, rely=0.4, anchor="center")
+        
+        lbl_title = tk.Label(inner_welcome, text="PDF Renamer Pro", font=("Segoe UI", 24, "bold"), fg="#1F2937", bg="#F0F2F5")
+        lbl_title.pack(pady=(0, 20))
+        
+        btn_big_select = ttk.Button(inner_welcome, text="📁 Chọn thư mục để bắt đầu", style="Primary.TButton", command=self.select_folder)
+        btn_big_select.pack(ipady=8, ipadx=16)
+
+        # ── Main Frame ──
+        self.main_frame = tk.Frame(self, bg="#F0F2F5")
+        
+        # Config card (nền trắng, bo góc)
+        config_card = tk.Frame(self.main_frame, bg="#FFFFFF", relief="flat", bd=1)
+        config_card.pack(fill=tk.X, pady=(0, 10))
+        
+        inner = tk.Frame(config_card, bg="#FFFFFF")
+        inner.pack(fill=tk.X, padx=16, pady=12)
+        
+        # Row 1: Tiền tố + Số bắt đầu + Sắp xếp
+        tk.Label(inner, text="Tiền tố", fg="#6B7280", bg="#FFFFFF", 
+                 font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w")
+        tk.Label(inner, text="Số bắt đầu", fg="#6B7280", bg="#FFFFFF",
+                 font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(16,0))
+        tk.Label(inner, text="Sắp xếp theo", fg="#6B7280", bg="#FFFFFF",
+                 font=("Segoe UI", 9)).grid(row=0, column=4, sticky="w", padx=(16,0))
+        tk.Label(inner, text="Thư mục nguồn", fg="#6B7280", bg="#FFFFFF",
+                 font=("Segoe UI", 9)).grid(row=0, column=6, sticky="w", padx=(16,0))
+        
+        self.entry_prefix = ttk.Entry(inner, width=38, font=("Segoe UI", 10))
+        self.entry_prefix.grid(row=1, column=0, sticky="ew", pady=(2,0))
+        
+        self.entry_start = ttk.Entry(inner, width=10, font=("Segoe UI", 10))
+        self.entry_start.grid(row=1, column=2, sticky="ew", padx=(16,0), pady=(2,0))
+        self.entry_start.insert(0, "001")
+        
+        self.cb_sort = ttk.Combobox(inner, 
+            values=["Tên file gốc", "Ngày sửa file", "Số ký hiệu", "Ngày văn bản", "Số trang"], 
+            state="readonly", width=16, font=("Segoe UI", 10))
+        self.cb_sort.current(0)
+        self.cb_sort.grid(row=1, column=4, sticky="ew", padx=(16,0), pady=(2,0))
+        self.cb_sort.bind("<<ComboboxSelected>>", lambda e: self.re_sort_table())
+        
+        folder_frame = tk.Frame(inner, bg="#FFFFFF")
+        folder_frame.grid(row=1, column=6, sticky="ew", padx=(16,0), pady=(2,0))
+        
+        ttk.Button(folder_frame, text="📁 Chọn", command=self.select_folder,
+                   width=8).pack(side=tk.LEFT)
+        self.lbl_folder = tk.Label(folder_frame, text="Chưa chọn", 
+                                    fg="#9CA3AF", bg="#FFFFFF",
+                                    font=("Segoe UI", 9), anchor="w", width=20)
+        self.lbl_folder.pack(side=tk.LEFT, padx=(8,0))
+        
+        self.entry_prefix.bind("<KeyRelease>", lambda e: self.recalculate_table())
+        self.entry_start.bind("<KeyRelease>", lambda e: self.recalculate_table())
+        
+        # Table card
+        table_card = tk.Frame(self.main_frame, bg="#FFFFFF", relief="flat", bd=1)
+        table_card.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        self.table = CustomTable(table_card, self.recalculate_table, self.view_thumbnail)
+        self.table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(table_card, orient="vertical", command=self.table.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.table.configure(yscrollcommand=scrollbar.set)
+        
+        # Bottom bar
+        bottom = tk.Frame(self.main_frame, bg="#FFFFFF", height=64)
+        bottom.pack(fill=tk.X, side=tk.BOTTOM)
+        bottom.pack_propagate(False)
+        
+        btn_frame = tk.Frame(bottom, bg="#FFFFFF")
+        btn_frame.pack(side=tk.RIGHT, padx=20, pady=12)
+        
+        self.btn_undo = ttk.Button(btn_frame, text="↩ Hoàn tác", 
+                                    style="Warning.TButton", command=self.do_undo, state=tk.DISABLED)
+        self.btn_undo.pack(side=tk.RIGHT, padx=(8,0))
+        
+        self.btn_rename = ttk.Button(btn_frame, text="✏ Đổi tên ngay", 
+                                      style="Success.TButton", command=self.do_rename, state=tk.DISABLED)
+        self.btn_rename.pack(side=tk.RIGHT, padx=(8,0))
+        
+        self.btn_scan = ttk.Button(btn_frame, text="🔍 Quét & Preview", 
+                                    style="Primary.TButton", command=self.start_scan)
+        self.btn_scan.pack(side=tk.RIGHT)
+        
+        status_frame = tk.Frame(bottom, bg="#FFFFFF")
+        status_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=20, pady=12)
+        
+        self.lbl_status = tk.Label(status_frame, text="Sẵn sàng", 
+                                    fg="#6B7280", bg="#FFFFFF", font=("Segoe UI", 9))
+        self.lbl_status.pack(anchor="w")
+        
+        self.progress_var = tk.DoubleVar()
+        self.progress = ttk.Progressbar(status_frame, variable=self.progress_var, 
+                                         maximum=100, style="green.Horizontal.TProgressbar",
+                                         length=300)
+        self.progress.pack(anchor="w", pady=(4,0))
+
+    def select_folder(self):
+        folder = filedialog.askdirectory()
+        if folder:
+            self.current_folder = folder
+            self.lbl_folder.config(text=folder if len(folder) <= 40 else "..." + folder[-37:])
+            
+            # Switch frames
+            self.welcome_frame.pack_forget()
+            self.main_frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=12)
+            
+            self.load_files_fast()
+
+    def load_files_fast(self):
+        self.pdf_files = [os.path.join(self.current_folder, f) for f in os.listdir(self.current_folder) if f.lower().endswith('.pdf')]
+        self.lbl_status.config(text=f"Đã tải {len(self.pdf_files)} file PDF.")
+        self.table.clear_all()
+        
+        results = []
+        for pdf_path in self.pdf_files:
+            file_data = {
+                "path": pdf_path,
+                "old_name": os.path.basename(pdf_path),
+                "so_kh": None,
+                "ngay_vb": None,
+                "so_trang": None,
+                "mtime": os.path.getmtime(pdf_path),
+                "thumbnail_path": None,
+                "checked": True,
+                "manual_edit": False,
+                "crop_sokh_path": None,
+                "crop_ngay_path": None,
+                "crop_trang_path": None,
+                "status_text": "Chưa quét",
+                "status_code": "idle",
+                "ngay_str": ""
+            }
+            results.append(file_data)
+            
+        for data in results:
+            self.table.insert_row(data)
+            
+        self.re_sort_table()
+        self.btn_rename.config(state=tk.NORMAL if results else tk.DISABLED)
+
+    def start_scan(self):
+        all_data = self.table.get_all_data()
+        if not all_data:
+            messagebox.showinfo("Thông báo", "Vui lòng chọn thư mục có chứa file PDF trước.")
+            return
+            
+        if self.is_processing:
+            self.cancel_scan = True
+            self.btn_scan.config(text="Đang dừng...", state=tk.DISABLED)
+            return
+            
+        if not is_tesseract_installed():
+            resp = messagebox.askyesno("Cảnh báo", "Không tìm thấy Tesseract OCR. OCR sẽ bị bỏ qua, bạn vẫn có thể tự sửa tên.\nBạn có muốn tiếp tục?")
+            if not resp:
+                return
+                
+        self.is_processing = True
+        self.cancel_scan = False
+        self.btn_scan.config(text="🛑 Dừng quét", style="Warning.TButton")
+        self.btn_rename.config(state=tk.DISABLED)
+        self.progress_var.set(0)
+        
+        # Run in thread
+        threading.Thread(target=self.scan_thread, args=(all_data,), daemon=True).start()
+
+    def scan_thread(self, all_data):
+        total = len(all_data)
+        
+        for i, data in enumerate(all_data):
+            if self.cancel_scan:
+                break
+                
+            pdf_path = data["path"]
+            
+            # Extract info
+            info = extract_pdf_info(pdf_path)
+            
+            data["so_kh"] = info.get("so_kh")
+            data["ngay_vb"] = info.get("ngay_vb")
+            data["so_trang"] = info.get("so_trang")
+            data["thumbnail_path"] = info.get("thumbnail_path")
+            data["crop_sokh_path"]  = info.get("crop_sokh_path")
+            data["crop_ngay_path"]  = info.get("crop_ngay_path")
+            data["crop_trang_path"] = info.get("crop_trang_path")
+            
+            # Determine Status
+            if info.get("error"):
+                data["status_text"] = "❌ Lỗi đọc"
+                data["status_code"] = "error"
+            elif info.get("so_kh"):
+                data["status_text"] = "🟢 Sẵn sàng"
+                data["status_code"] = "ok"
+                data["ngay_str"] = info["ngay_vb"].strftime("%d/%m/%Y") if info.get("ngay_vb") else ""
+            elif info.get("ngay_vb"):
+                data["status_text"] = "🔵 Dùng ngày"
+                data["status_code"] = "ok"
+                data["ngay_str"] = info["ngay_vb"].strftime("%d/%m/%Y")
+            else:
+                data["status_text"] = "🔴 Không đọc được KH"
+                data["status_code"] = "warn"
+                data["ngay_str"] = ""
+                
+            # Update UI safely
+            self.after(0, self.table.update_row_by_data, data)
+            
+            pct = int((i + 1) / total * 100)
+            self.after(0, self.update_progress, pct, f"Đang quét {i+1}/{total} file...")
+            
+        self.after(0, self.finish_scan)
+
+    def update_progress(self, val, text):
+        self.progress_var.set(val)
+        self.lbl_status.config(text=text)
+
+    def finish_scan(self):
+        self.re_sort_table()
+        
+        self.is_processing = False
+        self.btn_scan.config(text="🔍 Quét & Preview", style="Primary.TButton", state=tk.NORMAL)
+        self.btn_rename.config(state=tk.NORMAL)
+        
+        if self.cancel_scan:
+            self.lbl_status.config(text=f"Đã dừng quét. Vui lòng kiểm tra lại bảng.")
+        else:
+            self.lbl_status.config(text="Quét hoàn tất. Vui lòng kiểm tra lại bảng trước khi Đổi tên.")
+
+    def re_sort_table(self):
+        """Sắp xếp lại bảng dựa theo lựa chọn trong Combobox."""
+        all_data = self.table.get_all_data()
+        if not all_data: return
+        
+        sort_mode = self.cb_sort.get()
+        
+        if sort_mode == "Tên file gốc":
+            def sort_key(item):
+                return item.get("old_name", "").lower()
+        elif sort_mode == "Số ký hiệu":
+            def sort_key(item):
+                return (item.get("so_kh") if item.get("so_kh") is not None else float('inf'),
+                        item.get("ngay_vb") or datetime.max,
+                        item.get("mtime", 0))
+        elif sort_mode == "Ngày văn bản":
+            def sort_key(item):
+                return (item.get("ngay_vb") or datetime.max,
+                        item.get("so_kh") if item.get("so_kh") is not None else float('inf'),
+                        item.get("mtime", 0))
+        elif sort_mode == "Số trang":
+            def sort_key(item):
+                return (item.get("so_trang") if item.get("so_trang") is not None else float('inf'),
+                        item.get("so_kh") if item.get("so_kh") is not None else float('inf'),
+                        item.get("mtime", 0))
+        else: # Ngày sửa file
+            def sort_key(item):
+                return (item.get("mtime", 0),
+                        item.get("so_kh") if item.get("so_kh") is not None else float('inf'),
+                        item.get("ngay_vb") or datetime.max)
+                        
+        sorted_data = sorted(all_data, key=sort_key)
+        
+        self.table.clear_all()
+        for data in sorted_data:
+            self.table.insert_row(data)
+            
+        self.recalculate_table()
+
+    def recalculate_table(self):
+        """Tính toán lại cột STT và Tên file mới khi có thay đổi."""
+        prefix = self.entry_prefix.get()
+        start_num_str = self.entry_start.get()
+        
+        all_data = self.table.get_all_data()
+        
+        new_names = generate_new_names(all_data, prefix, start_num_str)
+        
+        stt = 1
+        for i, item_id in enumerate(self.table.get_children()):
+            data = all_data[i]
+            
+            if data.get("checked", True):
+                data["stt"] = str(stt)
+                stt += 1
+                
+                # Cập nhật tên mới nếu chưa bị sửa tay
+                if not data.get("manual_edit"):
+                    data["new_name"] = new_names[i]
+            else:
+                data["stt"] = "-"
+                data["new_name"] = "-"
+                
+            self.table.update_row_display(item_id)
+
+    def do_rename(self):
+        all_data = self.table.get_all_data()
+        rename_plan = []
+        
+        for data in all_data:
+            if data.get("checked", True) and data.get("new_name") and data.get("new_name") != "-":
+                old_p = data["path"]
+                new_p = os.path.join(self.current_folder, data["new_name"])
+                rename_plan.append({"old_path": old_p, "new_path": new_p})
+                
+        if not rename_plan:
+            messagebox.showinfo("Thông báo", "Không có file nào được chọn để đổi tên.")
+            return
+            
+        success, errors = execute_rename(rename_plan, self.current_folder)
+        
+        msg = f"Đã đổi tên thành công {success} file."
+        if errors:
+            msg += "\n\nCó lỗi xảy ra:\n" + "\n".join(errors[:5])
+            if len(errors) > 5: msg += "\n..."
+            
+        messagebox.showinfo("Kết quả", msg)
+        
+        if success > 0:
+            self.btn_undo.config(state=tk.NORMAL)
+            # Quét lại hoặc clear
+            self.load_files_fast()
+
+    def do_undo(self):
+        resp = messagebox.askyesno("Xác nhận", "Bạn có chắc muốn hoàn tác lần đổi tên vừa rồi?")
+        if resp:
+            success, errors = undo_last_rename()
+            msg = f"Đã khôi phục {success} file."
+            if errors:
+                msg += "\nLỗi:\n" + "\n".join(errors)
+            messagebox.showinfo("Hoàn tác", msg)
+            self.btn_undo.config(state=tk.DISABLED)
+
+    def view_thumbnail(self, img_path):
+        if os.path.exists(img_path):
+            ThumbnailDialog(self.main_window, img_path)
+
