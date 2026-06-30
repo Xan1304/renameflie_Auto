@@ -1,7 +1,4 @@
-# PDF Renamer Pro
 
-Ứng dụng desktop tự động đổi tên file PDF dựa trên dữ liệu trích xuất từ văn bản (Số ký hiệu và Ngày văn bản) thông qua OCR.
-Được thiết kế đặc biệt cho các loại văn bản hành chính Việt Nam.
 
 ## Hướng dẫn cài đặt
 
